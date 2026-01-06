@@ -376,6 +376,12 @@ const StatsPills = ({ total, companyCount, latency }: { total: number; companyCo
 
 const DetailPanel = () => (
   <aside class="detail-panel" id="detailPanel">
+    <button class="close-panel" id="closePanel" aria-label="Close Details">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
     <div class="panel-default" id="panelDefault">
       <div class="panel-default-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -451,6 +457,7 @@ app.get('/', async (c) => {
         </div>
         <DetailPanel />
       </div>
+      <div class="panel-overlay" id="panelOverlay"></div>
     </>
   )
 })

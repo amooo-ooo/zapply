@@ -33,6 +33,8 @@ const getElements = () => ({
     panelTags: document.getElementById('panelTags'),
     panelDescription: document.getElementById('panelDescription'),
     panelApplyBtn: document.getElementById('panelApplyBtn') as HTMLAnchorElement,
+    closePanel: document.getElementById('closePanel'),
+    panelOverlay: document.getElementById('panelOverlay'),
 })
 
 // --- Utilities ---
@@ -237,10 +239,32 @@ const initJobDetails = () => {
 
             elements.panelDefault.style.display = 'none'
             elements.panelContent.style.display = 'flex'
+
+            // Handle mobile specific logic
+            if (window.innerWidth <= 850) {
+                elements.panelOverlay?.classList.add('active')
+                document.body.style.overflow = 'hidden'
+            }
         } catch (e) {
             console.error('Error loading job details:', e)
         }
     }
+
+    const closeJobDetails = () => {
+        if (!elements.detailPanel) return
+
+        elements.detailPanel.classList.remove('open')
+        elements.panelOverlay?.classList.remove('active')
+        document.body.style.overflow = ''
+
+        if (state.currentActiveCard) {
+            state.currentActiveCard.classList.remove('active')
+            state.currentActiveCard = null
+        }
+    }
+
+    elements.closePanel?.addEventListener('click', closeJobDetails)
+    elements.panelOverlay?.addEventListener('click', closeJobDetails)
 
     const attachListeners = (container: Element) => {
         const jobCards = container.querySelectorAll('.job-card[data-job-id]')
