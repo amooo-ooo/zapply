@@ -329,7 +329,9 @@ const initFilters = () => {
             }
         }
 
-        const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`
+        // Replace encoded commas with literal commas for cleaner URLs
+        const queryString = params.toString().replace(/%2C/gi, ',')
+        const newUrl = `${window.location.pathname}${queryString ? '?' + queryString : ''}`
         window.location.href = newUrl
     })
 }
