@@ -124,7 +124,22 @@ export const renderer = jsxRenderer(({ children }) => {
           }}
         />
         <Script src="/src/client.ts" />
-        <title>Zapply | Early Career Roles</title>
+        <title>Internship & Early Career Roles | Zapply</title>
+        <meta name="description" content="Internship & early career search engine for students." />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://zapply.amorb.dev/" />
+        <meta property="og:title" content="Internship & Early Career Roles | Zapply" />
+        <meta property="og:description" content="Internship & early career search engine for students." />
+        <meta property="og:image" content="/og-image.png" />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content="https://zapply.amorb.dev/" />
+        <meta name="twitter:title" content="Internship & Early Career Roles | Zapply" />
+        <meta name="twitter:description" content="Internship & early career search engine for students." />
+        <meta name="twitter:image" content="/og-image.png" />
       </head>
       <body>
         <div class="app-layout">
