@@ -182,16 +182,37 @@ struct RemoteD1 {
 impl JobDb for RemoteD1 {
     async fn execute_batch(&self, queries: &[DbQuery]) -> Result<()> {
         for chunk in queries.chunks(10) {
-            let url = format!("https://api.cloudflare.com/client/v4/accounts/{}/d1/database/{}/batch", self.account_id, self.database_id);
+            let url = format!("https://api.cloudflare.com/client/v4/accounts/{}/d1/database/{}/raw", self.account_id, self.database_id);
+            
+            // Combine all statements into a single SQL string with semicolons
+            let combined_sql: String = chunk.iter()
+                .map(|q| {
+                    let mut statement = q.sql.clone();
+                    for (i, param) in q.params.iter().enumerate() {
+                        let placeholder = format!("?{}", i + 1);
+                        let val_str = match param {
+                            Value::String(s) => format!("'{}'", s.replace("'", "''")),
+                            Value::Number(n) => n.to_string(),
+                            Value::Bool(b) => b.to_string(),
+                            _ => "NULL".to_string(),
+                        };
+                        statement = statement.replace(&placeholder, &val_str);
+                    }
+                    statement
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            
+            let payload = serde_json::json!({ "sql": combined_sql });
             let resp = self.client.post(&url)
                 .bearer_auth(&self.api_token)
-                .json(&chunk)
+                .json(&payload)
                 .send()
                 .await?;
 
             if !resp.status().is_success() {
                 let text = resp.text().await?;
-                return Err(anyhow::anyhow!("D1 Batch API Error: {}", text));
+                return Err(anyhow::anyhow!("D1 API Error: {}", text));
             }
         }
         Ok(())
