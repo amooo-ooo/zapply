@@ -1,203 +1,218 @@
 import type { Job } from './types'
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Theme Toggle Logic
-    const themeToggle = document.getElementById('themeToggle')
-    const sunIcon = document.querySelector('.sun-icon') as HTMLElement
-    const moonIcon = document.querySelector('.moon-icon') as HTMLElement
+// --- Types ---
+interface GlobalState {
+    page: number
+    loading: boolean
+    hasMore: boolean
+    currentActiveCard: HTMLElement | null
+}
 
-    const setTheme = (isDark: boolean) => {
-        if (isDark) {
-            document.documentElement.style.colorScheme = 'dark'
-            document.documentElement.classList.add('dark')
-        } else {
-            document.documentElement.style.colorScheme = 'light'
-            document.documentElement.classList.remove('dark')
-        }
+const state: GlobalState = {
+    page: 1,
+    loading: false,
+    hasMore: true,
+    currentActiveCard: null
+}
+
+// --- DOM Elements ---
+const getElements = () => ({
+    themeToggle: document.getElementById('themeToggle'),
+    filterToggle: document.getElementById('filterToggle'),
+    filterRow: document.getElementById('filterRow'),
+    grid: document.querySelector('.jobs-grid') as HTMLElement,
+    mainContent: document.querySelector('.main-content'),
+    detailPanel: document.getElementById('detailPanel'),
+    panelDefault: document.getElementById('panelDefault'),
+    panelContent: document.getElementById('panelContent'),
+    panelJobTitle: document.getElementById('panelJobTitle'),
+    panelCompanyName: document.getElementById('panelCompanyName'),
+    panelCompanyIcon: document.getElementById('panelCompanyIcon'),
+    panelLocation: document.getElementById('panelLocation')?.querySelector('span'),
+    panelPosted: document.getElementById('panelPosted')?.querySelector('span'),
+    panelTags: document.getElementById('panelTags'),
+    panelDescription: document.getElementById('panelDescription'),
+    panelApplyBtn: document.getElementById('panelApplyBtn') as HTMLAnchorElement,
+})
+
+// --- Utilities ---
+const formatDate = (dateString: string) => {
+    if (!dateString) return ''
+    try {
+        const date = new Date(dateString)
+        return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
+    } catch (e) {
+        return dateString
     }
+}
 
-    // Initialize Theme
-    const savedTheme = localStorage.getItem('theme')
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+const getTagClass = (name: string) => {
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const classes = ['tag-blue', 'tag-green', 'tag-purple', 'tag-yellow', 'tag-red', 'tag-default']
+    return classes[hash % classes.length]
+}
 
-    // Default to system preference if no saved theme, otherwise use saved
-    let isDark = savedTheme ? savedTheme === 'dark' : systemPrefersDark
-    setTheme(isDark)
+const unescapeHtml = (html: string) => {
+    if (!html.includes('&lt;') && !html.includes('&gt;')) return html
+    const temp = document.createElement('div')
+    temp.innerHTML = html
+    return temp.textContent || temp.innerText || html
+}
 
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            isDark = !isDark
-            setTheme(isDark)
-            localStorage.setItem('theme', isDark ? 'dark' : 'light')
-        })
-    }
+// --- Tag Input Class ---
+class TagInput {
+    container: HTMLElement
+    pillsContainer: HTMLElement
+    input: HTMLInputElement
+    hiddenInput: HTMLInputElement
+    tags: string[] = []
 
-    // Filter Toggle
-    const filterToggle = document.getElementById('filterToggle')
-    if (filterToggle) {
-        filterToggle.addEventListener('click', function () {
-            const filterRow = document.getElementById('filterRow')
-            if (filterRow) {
-                if (filterRow.style.display === 'none') {
-                    filterRow.style.display = 'grid'
-                } else {
-                    filterRow.style.display = 'none'
-                }
-            }
-        })
-    }
+    constructor(containerId: string, pillsId: string, hiddenInputId: string) {
+        this.container = document.getElementById(containerId) as HTMLElement
+        this.pillsContainer = document.getElementById(pillsId) as HTMLElement
+        this.hiddenInput = document.getElementById(hiddenInputId) as HTMLInputElement
+        this.input = this.container?.querySelector('input') as HTMLInputElement
 
-    // --- Smart Tag Input Logic ---
-    class TagInput {
-        container: HTMLElement
-        pillsContainer: HTMLElement
-        input: HTMLInputElement
-        hiddenInput: HTMLInputElement
-        tags: string[] = []
-
-        constructor(containerId: string, pillsId: string, hiddenInputId: string) {
-            this.container = document.getElementById(containerId) as HTMLElement
-            this.pillsContainer = document.getElementById(pillsId) as HTMLElement
-            this.hiddenInput = document.getElementById(hiddenInputId) as HTMLInputElement
-            this.input = this.container.querySelector('input') as HTMLInputElement
-
-            if (!this.container || !this.pillsContainer || !this.hiddenInput || !this.input) {
-                console.warn(`TagInput: Missing elements for ${containerId}`)
-                return
-            }
-
-            // Initialize tags from hidden value
-            const initialValue = this.hiddenInput.value
-            if (initialValue) {
-                this.tags = initialValue.split(',').map(t => t.trim()).filter(Boolean)
-                this.renderPills()
-            }
-
-            this.setupEventListeners()
+        if (!this.container || !this.pillsContainer || !this.hiddenInput || !this.input) {
+            console.warn(`TagInput: Missing elements for ${containerId}`)
+            return
         }
 
-        setupEventListeners() {
-            // Focus input when clicking container
-            this.container.addEventListener('click', (e) => {
-                if (e.target !== this.input && !(e.target as HTMLElement).closest('.tag-remove')) {
-                    this.input.focus()
-                }
-            })
-
-            // Handle input keys
-            this.input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    if (this.input.value.trim()) {
-                        e.preventDefault()
-                        this.addTagFromInput()
-                    }
-                    // If empty, allow default behavior (form submission)
-                } else if (e.key === ',') {
-                    e.preventDefault()
-                    this.addTagFromInput()
-                } else if (e.key === 'Backspace' && this.input.value === '' && this.tags.length > 0) {
-                    this.removeTag(this.tags.length - 1)
-                }
-            })
-
-            // Handle blur to add remaining text as tag
-            this.input.addEventListener('blur', () => {
-                this.addTagFromInput()
-            })
-        }
-
-        addTagFromInput() {
-            const text = this.input.value.trim().replace(/,/g, '')
-            if (text) {
-                this.tags.push(text)
-                this.input.value = ''
-                this.update()
-            }
-        }
-
-        removeTag(index: number) {
-            this.tags.splice(index, 1)
-            this.update()
-        }
-
-        update() {
-            this.hiddenInput.value = this.tags.join(',')
+        const initialValue = this.hiddenInput.value
+        if (initialValue) {
+            this.tags = initialValue.split(',').map(t => t.trim()).filter(Boolean)
             this.renderPills()
         }
 
-        renderPills() {
-            this.pillsContainer.innerHTML = ''
-            this.tags.forEach((tag, index) => {
-                const pill = document.createElement('div')
-                pill.className = 'tag-pill'
-                pill.innerHTML = `
-            <span>${tag}</span>
-            <div class="tag-remove" data-index="${index}">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </div>
-          `
+        this.setupEventListeners()
+    }
 
-                pill.querySelector('.tag-remove')?.addEventListener('click', (e) => {
-                    e.stopPropagation() // Prevent container click
-                    this.removeTag(index)
-                })
+    setupEventListeners() {
+        this.container.addEventListener('click', (e) => {
+            if (e.target !== this.input && !(e.target as HTMLElement).closest('.tag-remove')) {
+                this.input.focus()
+            }
+        })
 
-                this.pillsContainer.appendChild(pill)
+        this.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (this.input.value.trim()) {
+                    e.preventDefault()
+                    this.addTagFromInput()
+                }
+            } else if (e.key === ',') {
+                e.preventDefault()
+                this.addTagFromInput()
+            } else if (e.key === 'Backspace' && this.input.value === '' && this.tags.length > 0) {
+                this.removeTag(this.tags.length - 1)
+            }
+        })
+
+        this.input.addEventListener('blur', () => this.addTagFromInput())
+    }
+
+    addTagFromInput() {
+        const text = this.input.value.trim().replace(/,/g, '')
+        if (text) {
+            this.tags.push(text)
+            this.input.value = ''
+            this.update()
+        }
+    }
+
+    removeTag(index: number) {
+        this.tags.splice(index, 1)
+        this.update()
+    }
+
+    update() {
+        this.hiddenInput.value = this.tags.join(',')
+        this.renderPills()
+    }
+
+    renderPills() {
+        this.pillsContainer.innerHTML = ''
+        this.tags.forEach((tag, index) => {
+            const pill = document.createElement('div')
+            pill.className = 'tag-pill'
+            pill.innerHTML = `
+                <span>${tag}</span>
+                <div class="tag-remove" data-index="${index}">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </div>
+            `
+            pill.querySelector('.tag-remove')?.addEventListener('click', (e) => {
+                e.stopPropagation()
+                this.removeTag(index)
             })
+            this.pillsContainer.appendChild(pill)
+        })
+    }
+}
+
+// --- Feature Modules ---
+const initTheme = () => {
+    const setTheme = (isDark: boolean) => {
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+        document.documentElement.classList.toggle('dark', isDark)
+    }
+
+    const savedTheme = localStorage.getItem('theme')
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    let isDark = savedTheme ? savedTheme === 'dark' : systemPrefersDark
+
+    setTheme(isDark)
+
+    const { themeToggle } = getElements()
+    themeToggle?.addEventListener('click', () => {
+        isDark = !isDark
+        setTheme(isDark)
+        localStorage.setItem('theme', isDark ? 'dark' : 'light')
+    })
+}
+
+const initFilters = () => {
+    const { filterToggle, filterRow } = getElements()
+    const searchForm = document.getElementById('searchForm') as HTMLFormElement
+
+    filterToggle?.addEventListener('click', () => {
+        if (filterRow) {
+            filterRow.style.display = filterRow.style.display === 'none' ? 'grid' : 'none'
         }
-    }
+    })
 
-    // Initialize Tag Inputs
-    new TagInput('locationTagContainer', 'locationPills', 'locationInput')
-    new TagInput('tagTagContainer', 'tagPills', 'tagInput')
-    // -----------------------------
+    searchForm?.addEventListener('submit', (e) => {
+        e.preventDefault()
+        const formData = new FormData(searchForm)
+        const params = new URLSearchParams()
 
-    // --- Detail Panel Logic ---
-    const detailPanel = document.getElementById('detailPanel')
-    const panelDefault = document.getElementById('panelDefault')
-    const panelContent = document.getElementById('panelContent')
-    const panelJobTitle = document.getElementById('panelJobTitle')
-    const panelCompanyName = document.getElementById('panelCompanyName')
-    const panelCompanyIcon = document.getElementById('panelCompanyIcon')
-    const panelLocation = document.getElementById('panelLocation')?.querySelector('span')
-    const panelPosted = document.getElementById('panelPosted')?.querySelector('span')
-    const panelTags = document.getElementById('panelTags')
-    const panelDescription = document.getElementById('panelDescription')
-    const panelApplyBtn = document.getElementById('panelApplyBtn') as HTMLAnchorElement
-
-    let currentActiveCard: HTMLElement | null = null
-
-    const formatDate = (dateString: string) => {
-        if (!dateString) return ''
-        try {
-            const date = new Date(dateString)
-            return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
-        } catch (e) {
-            return dateString
+        for (const [key, value] of formData.entries()) {
+            if (value && value.toString().trim()) {
+                params.append(key, value.toString().trim())
+            }
         }
-    }
 
-    const getTagClass = (name: string) => {
-        const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-        const classes = ['tag-blue', 'tag-green', 'tag-purple', 'tag-yellow', 'tag-red', 'tag-default']
-        return classes[hash % classes.length]
-    }
+        const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`
+        window.location.href = newUrl
+    })
+}
+
+const initJobDetails = () => {
+    const elements = getElements()
 
     const showJobDetails = async (jobId: string, cardElement: HTMLElement) => {
-        if (!detailPanel || !panelDefault || !panelContent) return
+        if (!elements.detailPanel || !elements.panelDefault || !elements.panelContent) return
 
-        // Update active state
-        if (currentActiveCard) {
-            currentActiveCard.classList.remove('active')
+        if (state.currentActiveCard) {
+            state.currentActiveCard.classList.remove('active')
         }
         cardElement.classList.add('active')
-        currentActiveCard = cardElement
+        state.currentActiveCard = cardElement
 
-        // Mobile: open panel
-        detailPanel.classList.add('open')
+        elements.detailPanel.classList.add('open')
 
         try {
             const res = await fetch(`/api/job/${jobId}`)
@@ -205,224 +220,147 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const job = await res.json() as Job
 
-            // Populate panel
-            if (panelJobTitle) panelJobTitle.textContent = job.title || 'Untitled'
-            if (panelCompanyName) panelCompanyName.textContent = job.company || 'Unknown'
-            if (panelCompanyIcon) panelCompanyIcon.textContent = job.company ? job.company.charAt(0).toUpperCase() : '?'
-            if (panelLocation) panelLocation.textContent = job.location || 'Not specified'
-            if (panelPosted) panelPosted.textContent = formatDate(job.posted) || 'Unknown'
-            if (panelApplyBtn) panelApplyBtn.href = job.url || '#'
+            if (elements.panelJobTitle) elements.panelJobTitle.textContent = job.title || 'Untitled'
+            if (elements.panelCompanyName) elements.panelCompanyName.textContent = job.company || 'Unknown'
+            if (elements.panelCompanyIcon) elements.panelCompanyIcon.textContent = job.company ? job.company.charAt(0).toUpperCase() : '?'
+            if (elements.panelLocation) elements.panelLocation.textContent = job.location || 'Not specified'
+            if (elements.panelPosted) elements.panelPosted.textContent = formatDate(job.posted) || 'Unknown'
+            if (elements.panelApplyBtn) elements.panelApplyBtn.href = job.url || '#'
 
-            // Tags
-            if (panelTags) {
-                panelTags.innerHTML = ''
+            if (elements.panelTags) {
+                elements.panelTags.innerHTML = ''
                 const allTags = [...(job.departments || []), ...(job.tags || [])]
                 allTags.forEach((tag: string) => {
                     const span = document.createElement('span')
                     span.className = `tag ${getTagClass(tag)}`
                     span.textContent = tag
-                    panelTags.appendChild(span)
+                    elements.panelTags!.appendChild(span)
                 })
             }
 
-            // Description
-            if (panelDescription) {
-                if (job.description) {
-                    // Some ATS or the database might return escaped HTML entities.
-                    // If the first character is '&' or we see common entities, we might need to unescape.
-                    // But usually innerHTML handles the first level if it's <p>...
-                    // If we see "&lt;p&gt;", we need to unescape it once to get "<p>".
-                    let desc = job.description;
-                    if (desc.includes('&lt;') || desc.includes('&gt;')) {
-                        const temp = document.createElement('div');
-                        temp.innerHTML = desc;
-                        desc = temp.textContent || temp.innerText || desc;
-                    }
-                    panelDescription.innerHTML = desc;
-                } else {
-                    panelDescription.innerHTML = '<p>No description available.</p>';
-                }
+            if (elements.panelDescription) {
+                elements.panelDescription.innerHTML = job.description ? unescapeHtml(job.description) : '<p>No description available.</p>'
             }
 
-            // Show content, hide default
-            panelDefault.style.display = 'none'
-            panelContent.style.display = 'flex'
+            elements.panelDefault.style.display = 'none'
+            elements.panelContent.style.display = 'flex'
         } catch (e) {
             console.error('Error loading job details:', e)
         }
     }
 
-    const attachJobCardListeners = (container: Element) => {
+    const attachListeners = (container: Element) => {
         const jobCards = container.querySelectorAll('.job-card[data-job-id]')
         jobCards.forEach((card) => {
-            card.addEventListener('click', (e) => {
-                // Don't trigger if clicking on the apply button
-                if ((e.target as HTMLElement).closest('.apply-btn')) return
+            // Use a flag to prevent multiple attachments
+            if ((card as any)._hasListener) return
+                ; (card as any)._hasListener = true
 
+            card.addEventListener('click', (e) => {
+                if ((e.target as HTMLElement).closest('.apply-btn')) return
                 const jobId = card.getAttribute('data-job-id')
-                if (jobId) {
-                    showJobDetails(jobId, card as HTMLElement)
-                }
+                if (jobId) showJobDetails(jobId, card as HTMLElement)
             })
         })
     }
 
-    // Attach listeners to initial cards
-    const mainContent = document.querySelector('.main-content')
-    if (mainContent) {
-        attachJobCardListeners(mainContent)
+    if (elements.mainContent) {
+        attachListeners(elements.mainContent)
     }
 
-    // Export for use in infinite scroll
-    (window as any).attachJobCardListeners = attachJobCardListeners
-    // -----------------------------
+    // Export to global for infinite scroll
+    ; (window as any).attachJobCardListeners = attachListeners
+}
 
-    // Infinite Scroll Logic
+const initInfiniteScroll = () => {
+    const { grid } = getElements()
+    if (!grid) return
+
     const urlParams = new URLSearchParams(window.location.search)
-    let page = parseInt(urlParams.get('page') || '1')
-    console.log('Initial page:', page)
+    state.page = parseInt(urlParams.get('page') || '1')
 
-    let loading = false
-    let hasMore = true
-    const grid = document.querySelector('.jobs-grid')
-
-    if (!grid) {
-        console.error('Jobs grid not found')
-        return
-    }
-
-    // Create loading element (Skeleton Container)
     const loadingElement = document.createElement('div')
     loadingElement.className = 'skeleton-container'
+    loadingElement.style.display = 'contents'
 
-    // Create 4 skeleton cards
-    const createSkeletonCard = () => {
-        return `
-      <div class="skeleton-card">
-        <div class="skeleton-header">
-          <div class="skeleton-icon"></div>
-          <div class="skeleton-company"></div>
+    const skeletonHtml = `
+        <div class="skeleton-card">
+            <div class="skeleton-header"><div class="skeleton-icon"></div><div class="skeleton-company"></div></div>
+            <div class="skeleton-body">
+                <div class="skeleton-title"></div>
+                <div class="skeleton-tags"><div class="skeleton-tag"></div><div class="skeleton-tag"></div><div class="skeleton-tag"></div></div>
+            </div>
+            <div class="skeleton-footer"><div class="skeleton-ats"></div><div class="skeleton-btn"></div></div>
         </div>
-        <div class="skeleton-body">
-          <div class="skeleton-title"></div>
-          <div class="skeleton-tags">
-            <div class="skeleton-tag"></div>
-            <div class="skeleton-tag"></div>
-            <div class="skeleton-tag"></div>
-          </div>
-        </div>
-        <div class="skeleton-footer">
-          <div class="skeleton-ats"></div>
-          <div class="skeleton-btn"></div>
-        </div>
-      </div>
     `
-    }
-
-    loadingElement.innerHTML = Array(4).fill(null).map(createSkeletonCard).join('')
-    loadingElement.style.display = 'contents' // Use contents so children share the grid
-
-    // Initially hide it by not appending it, or appending hidden. 
-    // Since we want to toggle visibility, let's keep it in DOM but hidden. 
-    // Or just append/remove. Appending/removing is cleaner for grid.
-    // Actually, let's just use a class or style to toggle.
-    // The 'contents' display might make toggling 'display: none' tricky if we want to preserve 'display: contents'.
-    // Better to append it to the grid when loading, and remove it when done.
+    loadingElement.innerHTML = Array(4).fill(skeletonHtml).join('')
 
     const fetchMoreJobs = async () => {
-        if (loading || !hasMore) return
-        console.log('Fetching more jobs, page:', page + 1)
-        loading = true
-
-        // Append skeleton loader to grid
+        if (state.loading || !state.hasMore) return
+        state.loading = true
         grid.appendChild(loadingElement)
 
-        // Get current URL params
         const currentUrlParams = new URLSearchParams(window.location.search)
-        currentUrlParams.set('page', (page + 1).toString())
+        currentUrlParams.set('page', (state.page + 1).toString())
 
         try {
             const res = await fetch(`/api/jobs?${currentUrlParams.toString()}`)
             if (res.status === 204) {
-                hasMore = false
-                loading = false
-                if (loadingElement.parentNode === grid) {
-                    grid.removeChild(loadingElement)
-                }
-                return
-            }
-
-            const html = await res.text()
-            if (!html) {
-                hasMore = false
+                state.hasMore = false
             } else {
-                const div = document.createElement('div')
-                div.innerHTML = html
-
-                // Remove skeletons before appending new items to avoid visual jumpiness or ordering issues
-                if (loadingElement.parentNode === grid) {
-                    grid.removeChild(loadingElement)
+                const html = await res.text()
+                if (html) {
+                    const div = document.createElement('div')
+                    div.innerHTML = html
+                    Array.from(div.children).forEach(child => grid.appendChild(child))
+                    if ((window as any).attachJobCardListeners) {
+                        (window as any).attachJobCardListeners(grid)
+                    }
+                    state.page++
+                } else {
+                    state.hasMore = false
                 }
-
-                // Extract valid job cards and append
-                Array.from(div.children).forEach((child) => {
-                    grid.appendChild(child)
-                })
-
-                // Attach click listeners to new cards
-                if ((window as any).attachJobCardListeners) {
-                    (window as any).attachJobCardListeners(grid)
-                }
-
-                page++
             }
         } catch (e) {
             console.error('Error fetching jobs:', e)
         } finally {
-            loading = false
-            if (loadingElement.parentNode === grid) {
-                try {
-                    grid.removeChild(loadingElement)
-                } catch (e) {
-                    // Ignore if already removed
-                }
-            }
+            state.loading = false
+            if (loadingElement.parentNode === grid) grid.removeChild(loadingElement)
+            checkSentinelVisibility()
+        }
+    }
 
-            // Check if we need to fetch more immediately (if sentinel is still visible)
-            // This happens if the fetched content isn't enough to fill the screen
-            const sentinel = document.getElementById('scroll-sentinel')
-            if (hasMore && sentinel) {
-                const rect = sentinel.getBoundingClientRect()
-                // If sentinel is visible (top is within viewport)
-                if (rect.top < window.innerHeight) {
-                    console.log('Sentinel still visible, fetching more...')
-                    fetchMoreJobs()
-                }
-            }
+    const checkSentinelVisibility = () => {
+        const sentinel = document.getElementById('scroll-sentinel')
+        if (state.hasMore && sentinel) {
+            const rect = sentinel.getBoundingClientRect()
+            if (rect.top < window.innerHeight) fetchMoreJobs()
         }
     }
 
     const observer = new IntersectionObserver(
         (entries) => {
-            if (entries[0].isIntersecting) {
-                fetchMoreJobs()
-            }
+            if (entries[0].isIntersecting) fetchMoreJobs()
         },
-        {
-            root: null,
-            rootMargin: '100px', // Fetch before reaching the bottom
-            threshold: 0.1,
-        }
+        { root: null, rootMargin: '100px', threshold: 0.1 }
     )
 
-    // Observer target
     const sentinel = document.createElement('div')
     sentinel.id = 'scroll-sentinel'
     sentinel.style.height = '10px'
     sentinel.style.width = '100%'
-    if (grid && grid.parentNode) {
-        grid.parentNode.insertBefore(sentinel, grid.nextSibling)
-    }
-
+    grid.parentNode?.insertBefore(sentinel, grid.nextSibling)
     observer.observe(sentinel)
+}
+
+// --- Main Initialization ---
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme()
+    initFilters()
+    new TagInput('locationTagContainer', 'locationPills', 'locationInput')
+    new TagInput('tagTagContainer', 'tagPills', 'tagInput')
+    new TagInput('sourceTagContainer', 'sourcePills', 'sourceInput')
+    initJobDetails()
+    initInfiniteScroll()
 })
+
