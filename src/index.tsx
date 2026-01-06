@@ -604,7 +604,7 @@ app.get('/', async (c) => {
       <header>
         <div class="header-title">
           <h1>Explore Roles</h1>
-          <p>Early career search engine for students.</p>
+          <p>Internship & early career search engine for students.</p>
         </div>
       </header>
 
