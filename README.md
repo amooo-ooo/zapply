@@ -3,10 +3,10 @@
 zapply is an internship and early career search engine for students for the competitive job market. zapply aggregates opportunities and tags relevant roles directly from company ATS systems and other job boards.
 
 <p align="center">
-  <img src="docs/assets/screenshot.png" alt="zapply Screenshot" width="750">
+  <img src="docs/assets/screenshot.png" alt="zapply Screenshot" width="700">
 </p>
 
-> [!INFO]
+> [!NOTE]
 > Project still in heavy development.
 
 ## Features
@@ -60,7 +60,7 @@ Deploy to Cloudflare Workers:
 ```bash
 wrangler d1 create zapply --remote
 bun run db:setup --remote
-bun run scrape:slugs --prod
+bun run scrape:slugs 
 bun run scrape --prod
 bun run deploy
 ```
