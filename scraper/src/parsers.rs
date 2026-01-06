@@ -1,6 +1,7 @@
 use serde_json::Value;
 use crate::models::*;
 use chrono::{DateTime, Utc, TimeZone};
+use ammonia;
 
 // --- Parsing Trait ---
 
@@ -34,6 +35,24 @@ fn normalize_date(date_str: &str) -> String {
     }
 
     date_str.to_string()
+}
+
+fn clean_html(html: &str) -> String {
+    if html.is_empty() { return String::new(); }
+    
+    // Decode common entities if it looks double-escaped
+    let decoded = if html.contains("&lt;") || html.contains("&gt;") || html.contains("&amp;") {
+        html.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&nbsp;", " ")
+    } else {
+        html.to_string()
+    };
+
+    ammonia::clean(&decoded)
 }
 
 impl AtsParser for AtsType {
@@ -80,7 +99,7 @@ impl AtsType {
             let is_edu_optional = self.is_greenhouse_education_optional(&rj);
             let mut job = self.new_job(company, rj.id.to_string(), rj.title, rj.url);
             
-            job.description = rj.description.as_ref().map(|d| d.as_str().to_string()).unwrap_or_default();
+            job.description = rj.description.as_ref().map(|d| clean_html(d.as_str())).unwrap_or_default();
             job.posted = normalize_date(rj.posted.as_deref().unwrap_or_default());
             
             job.location = match rj.location {
@@ -145,7 +164,7 @@ impl AtsType {
 
         items.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id, j.text, j.hosted_url);
-            job.description = j.description_plain.or(j.description).unwrap_or_default();
+            job.description = clean_html(&j.description_plain.or(j.description).unwrap_or_default());
             job.location = j.categories.location.unwrap_or_default();
             job.posted = normalize_date(&j.created_at.map(|c| c.to_string()).unwrap_or_default());
             
@@ -183,7 +202,7 @@ impl AtsType {
             
             job.description = j.description_plain.as_ref()
                 .or(j.description_html.as_ref())
-                .map(|d| d.as_str().to_string())
+                .map(|d| clean_html(d.as_str()))
                 .unwrap_or_default();
 
             if let Some(dept) = j.department {
@@ -208,7 +227,7 @@ impl AtsType {
         let resp: RecruiteeResponse = serde_json::from_value(data.clone()).unwrap_or(RecruiteeResponse { offers: vec![] });
         resp.offers.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id.to_string(), j.title, j.careers_url);
-            job.description = j.description.unwrap_or_default();
+            job.description = clean_html(&j.description.unwrap_or_default());
             job.location = j.location.unwrap_or_default();
             job.posted = normalize_date(&j.created_at.unwrap_or_default());
             if let Some(dept) = j.department {
@@ -223,7 +242,7 @@ impl AtsType {
         items.into_iter().map(|j| {
             let url = format!("https://{}.breezy.hr/p/{}", company.slug, j.id);
             let mut job = self.new_job(company, j.id, j.name, url);
-            job.description = j.description.unwrap_or_default();
+            job.description = clean_html(&j.description.unwrap_or_default());
             job.location = j.location.and_then(|l| l.name).unwrap_or_default();
             job.posted = normalize_date(&j.updated_at.unwrap_or_default());
             if let Some(dept) = j.department {

@@ -52,13 +52,6 @@ const getTagClass = (name: string) => {
     return classes[hash % classes.length]
 }
 
-const unescapeHtml = (html: string) => {
-    if (!html.includes('&lt;') && !html.includes('&gt;')) return html
-    const temp = document.createElement('div')
-    temp.innerHTML = html
-    return temp.textContent || temp.innerText || html
-}
-
 // --- Tag Input Class ---
 class TagInput {
     container: HTMLElement
@@ -239,7 +232,7 @@ const initJobDetails = () => {
             }
 
             if (elements.panelDescription) {
-                elements.panelDescription.innerHTML = job.description ? unescapeHtml(job.description) : '<p>No description available.</p>'
+                elements.panelDescription.innerHTML = job.description || '<p>No description available.</p>'
             }
 
             elements.panelDefault.style.display = 'none'
