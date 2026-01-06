@@ -1,5 +1,6 @@
 mod models;
 mod parsers;
+mod tag;
 
 use anyhow::{Context, Result};
 use futures::stream::{self, StreamExt};
@@ -15,6 +16,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::models::{Job, CompanyEntry, AtsType};
 use crate::parsers::AtsParser;
+use crate::tag::TagEngine;
 
 // --- Configuration & Types ---
 
@@ -250,6 +252,7 @@ struct Scraper {
     keyword_regex: Regex,
     cache: HashSet<String>,
     log_file: Option<Arc<Mutex<fs::File>>>,
+    tag_engine: Arc<TagEngine>,
 }
 
 impl Scraper {
@@ -259,10 +262,11 @@ impl Scraper {
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
         let log_file = log_file.map(|f| Arc::new(Mutex::new(f)));
-        Ok(Self { client, keyword_regex, cache, log_file })
+        let tag_engine = Arc::new(TagEngine::new());
+        Ok(Self { client, keyword_regex, cache, log_file, tag_engine })
     }
 
-    async fn process_company(client: &reqwest::Client, company: &CompanyEntry, regex: &Regex) -> Result<Vec<Job>> {
+    async fn process_company(client: &reqwest::Client, company: &CompanyEntry, regex: &Regex, tag_engine: &TagEngine) -> Result<Vec<Job>> {
         let mut url = company.api_url.clone();
         if company.ats_type == AtsType::Greenhouse && !url.contains("content=true") {
             url.push_str(if url.contains('?') { "&content=true" } else { "?content=true" });
@@ -275,7 +279,17 @@ impl Scraper {
         
         let data: Value = resp.json().await?;
         let jobs = company.ats_type.parse(company, &data);
-        let filtered: Vec<Job> = jobs.into_iter().filter(|j| regex.is_match(&j.title)).collect();
+        let filtered: Vec<Job> = jobs.into_iter()
+            .filter(|j| regex.is_match(&j.title))
+            .map(|mut j| {
+                let mut unique_tags = HashSet::new();
+                unique_tags.extend(j.tags);
+                unique_tags.extend(tag_engine.detect_tags(&j.description).into_iter().map(String::from));
+                unique_tags.extend(tag_engine.detect_tags(&j.title).into_iter().map(String::from));
+                j.tags = unique_tags.into_iter().collect();
+                j
+            })
+            .collect();
         Ok(filtered)
     }
 
@@ -293,6 +307,7 @@ impl Scraper {
         let fail_count = Arc::new(AtomicUsize::new(0));
         let jobs_count = Arc::new(AtomicUsize::new(0));
         let log_file = self.log_file.clone();
+        let tag_engine = self.tag_engine.clone();
 
         let results = stream::iter(companies)
             .map(|company| {
@@ -303,9 +318,10 @@ impl Scraper {
                 let jobs_count = jobs_count.clone();
                 let log_file = log_file.clone();
                 let pb = pb.clone();
+                let tag_engine = tag_engine.clone();
 
                 async move {
-                    let result = Self::process_company(&client, &company, &regex).await;
+                    let result = Self::process_company(&client, &company, &regex, &tag_engine).await;
                     let jobs = match result {
                         Ok(j) => {
                             success_count.fetch_add(1, Ordering::SeqCst);

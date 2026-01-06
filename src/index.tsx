@@ -21,11 +21,18 @@ const app = new Hono<Env>()
 
 app.use(renderer)
 
-// Helper functions (moved outside component)
-const getTagClass = (name: string) => {
-  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  const classes = ['tag-blue', 'tag-green', 'tag-purple', 'tag-yellow', 'tag-red', 'tag-default']
-  return classes[hash % classes.length]
+// Helper functions
+
+const getTagStyle = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Hue is determined by hash (0-360)
+  // Saturation: 70% (Pastel but vibrant)
+  // Lightness: 96% (Background), 25% (Text), 85% (Border)
+  const h = Math.abs(hash % 360);
+  return `background-color: hsl(${h}, 70%, 96%); color: hsl(${h}, 80%, 25%); border: 1px solid hsl(${h}, 60%, 85%);`
 }
 
 const formatDate = (dateString: string) => {
@@ -98,15 +105,18 @@ const JobCard = ({ job }: { job: Job }) => {
               {dept}
             </span>
           ))}
-          {job.tags?.map((tag: string) => (
-            <span class={`tag ${getTagClass(tag)}`}>{tag}</span>
+          {job.tags?.slice(0, 7).map((tag: string) => (
+            <span class="tag" style={getTagStyle(tag)}>{tag}</span>
           ))}
+          {(job.tags?.length || 0) > 7 && (
+            <span class="tag tag-more">+{job.tags!.length - 7}</span>
+          )}
         </div>
       </div>
 
       <div class="card-footer">
         <div class="tags">
-          <span class={`tag ${getTagClass(job.ats)} ats-tag`}>{formatAts(job.ats)}</span>
+          <span class="tag ats-tag" style={getTagStyle(job.ats)}>{formatAts(job.ats)}</span>
         </div>
         <a href={job.url} target="_blank" class="apply-btn">Apply</a>
       </div>
@@ -337,7 +347,7 @@ const SearchFilters = ({ params, total, companyCount, latency }: { params: Searc
             <label class="filter-label">Tags</label>
             <div class="tag-input-container" id="tagTagContainer">
               <div class="tag-pills" id="tagPills"></div>
-              <input type="text" class="tag-input-field" placeholder="e.g. Internship, React" autocomplete="off" />
+              <input type="text" class="tag-input-field" placeholder="e.g. Python, React" autocomplete="off" />
             </div>
           </div>
 
@@ -345,7 +355,7 @@ const SearchFilters = ({ params, total, companyCount, latency }: { params: Searc
             <label class="filter-label">Source</label>
             <div class="tag-input-container" id="sourceTagContainer">
               <div class="tag-pills" id="sourcePills"></div>
-              <input type="text" class="tag-input-field" placeholder="e.g. Greenhouse, Lever" autocomplete="off" />
+              <input type="text" class="tag-input-field" placeholder="e.g. Greenhouse, Ashby" autocomplete="off" />
             </div>
           </div>
 

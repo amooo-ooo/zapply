@@ -48,10 +48,13 @@ const formatDate = (dateString: string) => {
     }
 }
 
-const getTagClass = (name: string) => {
-    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    const classes = ['tag-blue', 'tag-green', 'tag-purple', 'tag-yellow', 'tag-red', 'tag-default']
-    return classes[hash % classes.length]
+const getTagStyle = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash % 360);
+    return `background-color: hsl(${h}, 70%, 96%); color: hsl(${h}, 80%, 25%); border: 1px solid hsl(${h}, 60%, 85%);`
 }
 
 // --- Tag Input Class ---
@@ -225,12 +228,21 @@ const initJobDetails = () => {
             if (elements.panelTags) {
                 elements.panelTags.innerHTML = ''
                 const allTags = [...(job.departments || []), ...(job.tags || [])]
-                allTags.forEach((tag: string) => {
+                const displayTags = allTags.slice(0, 10)
+                displayTags.forEach((tag: string) => {
                     const span = document.createElement('span')
-                    span.className = `tag ${getTagClass(tag)}`
+                    span.className = 'tag'
+                    span.style.cssText = getTagStyle(tag)
                     span.textContent = tag
                     elements.panelTags!.appendChild(span)
                 })
+
+                if (allTags.length > 10) {
+                    const moreSpan = document.createElement('span')
+                    moreSpan.className = 'tag tag-more'
+                    moreSpan.textContent = `+${allTags.length - 10}`
+                    elements.panelTags!.appendChild(moreSpan)
+                }
             }
 
             if (elements.panelDescription) {
