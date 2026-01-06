@@ -1,13 +1,13 @@
 # zapply
 
-zapply is an internship and early career search engine for students for the competitive job market. zapply aggregates opportunities and tags relevant roles directly from company ATS systems and other job boards.
+zapply is an internship and early career search engine for students facing the competitive job market. zapply aggregates opportunities and tags relevant roles directly from company ATS systems and other job boards.
 
 <p align="center">
   <img src="docs/assets/screenshot.png" alt="zapply Screenshot" width="700">
 </p>
 
 > [!NOTE]
-> Project still in heavy development.
+> Project still in heavy development, expect issues.
 
 ## Features
 
@@ -51,7 +51,7 @@ bun run dev
 4. **Run Scraper**:
 ```bash
 bun run scrape:slugs
-bun run scrape
+bun run scrape --limit=1000
 ```
 
 ## Deployment
