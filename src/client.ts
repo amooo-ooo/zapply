@@ -33,6 +33,9 @@ const getElements = () => ({
     panelTags: document.getElementById('panelTags'),
     panelDescription: document.getElementById('panelDescription'),
     panelApplyBtn: document.getElementById('panelApplyBtn') as HTMLAnchorElement,
+    panelDegree: document.getElementById('panelDegree'),
+    panelField: document.getElementById('panelField'),
+    panelDept: document.getElementById('panelDept'),
     closePanel: document.getElementById('closePanel'),
     panelOverlay: document.getElementById('panelOverlay'),
 })
@@ -49,12 +52,13 @@ const formatDate = (dateString: string) => {
 }
 
 const getTagStyle = (name: string) => {
+    const hues = [217, 142, 273, 38, 350, 189, 239, 14]
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
         hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const h = Math.abs(hash % 360);
-    return `background-color: hsl(${h}, 70%, 96%); color: hsl(${h}, 80%, 25%); border: 1px solid hsl(${h}, 60%, 85%);`
+    const h = hues[Math.abs(hash) % hues.length];
+    return `--tag-hue: ${h};`
 }
 
 // --- Tag Input Class ---
@@ -225,22 +229,55 @@ const initJobDetails = () => {
             if (elements.panelPosted) elements.panelPosted.textContent = formatDate(job.posted) || 'Unknown'
             if (elements.panelApplyBtn) elements.panelApplyBtn.href = job.url || '#'
 
+            if (elements.panelDegree) {
+                if (job.degree_level) {
+                    elements.panelDegree.style.display = 'flex'
+                    const span = elements.panelDegree.querySelector('span')
+                    if (span) span.textContent = job.degree_level
+                } else {
+                    elements.panelDegree.style.display = 'none'
+                }
+            }
+
+            if (elements.panelField) {
+                if (job.subject_area) {
+                    elements.panelField.style.display = 'flex'
+                    const span = elements.panelField.querySelector('span')
+                    if (span) span.textContent = job.subject_area
+                } else {
+                    elements.panelField.style.display = 'none'
+                }
+            }
+
+            if (elements.panelDept) {
+                if (job.departments && job.departments.length > 0) {
+                    elements.panelDept.style.display = 'flex'
+                    const span = elements.panelDept.querySelector('span')
+                    if (span) span.textContent = job.departments.join(', ')
+                } else {
+                    elements.panelDept.style.display = 'none'
+                }
+            }
+
             if (elements.panelTags) {
                 elements.panelTags.innerHTML = ''
-                const allTags = [...(job.departments || []), ...(job.tags || [])]
-                const displayTags = allTags.slice(0, 10)
+                const allTags = job.tags || []
+                const displayTags = allTags.slice(0, 12)
                 displayTags.forEach((tag: string) => {
+                    const isRainbow = tag.toUpperCase().includes('LGBTQ')
                     const span = document.createElement('span')
-                    span.className = 'tag'
-                    span.style.cssText = getTagStyle(tag)
+                    span.className = `tag ${isRainbow ? 'tag-rainbow' : ''}`
+                    if (!isRainbow) {
+                        span.style.cssText = getTagStyle(tag)
+                    }
                     span.textContent = tag
                     elements.panelTags!.appendChild(span)
                 })
 
-                if (allTags.length > 10) {
+                if (allTags.length > 12) {
                     const moreSpan = document.createElement('span')
                     moreSpan.className = 'tag tag-more'
-                    moreSpan.textContent = `+${allTags.length - 10}`
+                    moreSpan.textContent = `+${allTags.length - 12}`
                     elements.panelTags!.appendChild(moreSpan)
                 }
             }
@@ -389,6 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
     new TagInput('locationTagContainer', 'locationPills', 'locationInput')
     new TagInput('tagTagContainer', 'tagPills', 'tagInput')
     new TagInput('sourceTagContainer', 'sourcePills', 'sourceInput')
+    new TagInput('fieldTagContainer', 'fieldPills', 'fieldInput')
     initJobDetails()
     initInfiniteScroll()
 })

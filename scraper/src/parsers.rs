@@ -86,6 +86,8 @@ impl AtsType {
             departments: vec![],
             offices: vec![],
             tags: vec![],
+            degree_levels: vec![],
+            subject_areas: vec![],
         }
     }
 

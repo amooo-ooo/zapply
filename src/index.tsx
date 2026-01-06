@@ -13,6 +13,8 @@ type SearchParams = {
   location?: string
   tag?: string
   source?: string
+  degree?: string
+  field?: string
   posted?: string
   page?: number
 }
@@ -24,15 +26,24 @@ app.use(renderer)
 // Helper functions
 
 const getTagStyle = (name: string) => {
+  const hues = [
+    217, // Blue
+    142, // Green
+    273, // Purple
+    38,  // Amber
+    350, // Rose
+    189, // Cyan
+    239, // Indigo
+    14,  // Orange
+  ]
+
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  // Hue is determined by hash (0-360)
-  // Saturation: 70% (Pastel but vibrant)
-  // Lightness: 96% (Background), 25% (Text), 85% (Border)
-  const h = Math.abs(hash % 360);
-  return `background-color: hsl(${h}, 70%, 96%); color: hsl(${h}, 80%, 25%); border: 1px solid hsl(${h}, 60%, 85%);`
+
+  const h = hues[Math.abs(hash) % hues.length];
+  return `--tag-hue: ${h};`
 }
 
 const formatDate = (dateString: string) => {
@@ -99,15 +110,29 @@ const JobCard = ({ job }: { job: Job }) => {
               {formatLocation(loc)}
             </div>
           ))}
-          {job.departments && job.departments.map((dept: string) => (
-            <span class="dashed-tag">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-              {dept}
+          {job.degree_levels?.map((degree: string) => (
+            <span class="dashed-tag" title="Degree Level">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+              {degree}
             </span>
           ))}
-          {job.tags?.slice(0, 7).map((tag: string) => (
-            <span class="tag" style={getTagStyle(tag)}>{tag}</span>
+          {job.subject_areas?.map((area: string) => (
+            <span class="dashed-tag" title="Field of Study">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              {area}
+            </span>
           ))}
+          {job.tags?.slice(0, 7).map((tag: string) => {
+            const isRainbow = tag.toUpperCase().includes('LGBTQ')
+            return (
+              <span
+                class={`tag ${isRainbow ? 'tag-rainbow' : ''}`}
+                style={isRainbow ? '' : getTagStyle(tag)}
+              >
+                {tag}
+              </span>
+            )
+          })}
           {(job.tags?.length || 0) > 7 && (
             <span class="tag tag-more">+{job.tags!.length - 7}</span>
           )}
@@ -130,6 +155,8 @@ const getSearchParams = (c: any): SearchParams => {
     location: c.req.query('location'),
     tag: c.req.query('tag'),
     source: c.req.query('source'),
+    degree: c.req.query('degree'),
+    field: c.req.query('field'),
     posted: c.req.query('posted'),
     page: parseInt(c.req.query('page') || '1'),
   }
@@ -204,59 +231,86 @@ const getJobs = async (
     }
   }
 
-  // Count query
+  if (params.degree) {
+    whereClause += ' AND id IN (SELECT job_id FROM job_degree_levels WHERE name = ?)'
+    sqlParams.push(params.degree)
+  }
+
+  if (params.field) {
+    const fields = params.field.split(',').map(f => f.trim()).filter(Boolean)
+    if (fields.length > 0) {
+      const conditions = fields.map(() => 'name LIKE ? ESCAPE "\\"').join(' OR ')
+      whereClause += ` AND id IN (SELECT job_id FROM job_subject_areas WHERE ${conditions})`
+      fields.forEach(f => {
+        sqlParams.push(`%${escapeLike(f)}%`)
+      })
+    }
+  }
+
+  // Consolidated Counts and Data query
   const countSql = `SELECT COUNT(*) as total FROM jobs ${whereClause}`
-
-  // Company count query
   const companyCountSql = `SELECT COUNT(DISTINCT company) as total FROM jobs ${whereClause}`
-
-  // Data query
-  const dataSql = `SELECT * FROM jobs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-  const dataParams = [...sqlParams, limit, offset]
+  const dataSql = `SELECT id, title, company, slug, ats, url, location, posted, created_at FROM jobs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
 
   try {
-    // Get total count
-    const { results: countResults } = await db.prepare(countSql).bind(...sqlParams).all()
-    const total = countResults[0].total as number
+    // Execute counts and data query in a single batch
+    const [countRes, companyRes, dataRes] = await db.batch([
+      db.prepare(countSql).bind(...sqlParams),
+      db.prepare(companyCountSql).bind(...sqlParams),
+      db.prepare(dataSql).bind(...sqlParams, limit, offset)
+    ])
 
-    // Get unique companies
-    const { results: companyResults } = await db.prepare(companyCountSql).bind(...sqlParams).all()
-    const companyCount = companyResults[0].total as number
-
-    // Get jobs
-    const { results } = await db.prepare(dataSql).bind(...dataParams).all()
-    const jobs = results as unknown as Job[]
+    const total = (countRes.results[0] as any).total
+    const companyCount = (companyRes.results[0] as any).total
+    const jobs = dataRes.results as unknown as Job[]
 
     if (jobs.length > 0) {
       const jobIds = jobs.map(j => j.id)
       const placeholders = jobIds.map(() => '?').join(',')
 
-      // Batch fetch tags
-      const { results: allTags } = await db.prepare(
-        `SELECT job_id, name FROM job_tags WHERE job_id IN (${placeholders})`
-      ).bind(...jobIds).all()
+      // Batch fetch all relations in a second batch
+      const [tagsRes, deptsRes, degreesRes, subjectsRes] = await db.batch([
+        db.prepare(`SELECT job_id, name FROM job_tags WHERE job_id IN (${placeholders})`).bind(...jobIds),
+        db.prepare(`SELECT job_id, name FROM job_departments WHERE job_id IN (${placeholders})`).bind(...jobIds),
+        db.prepare(`SELECT job_id, name FROM job_degree_levels WHERE job_id IN (${placeholders})`).bind(...jobIds),
+        db.prepare(`SELECT job_id, name FROM job_subject_areas WHERE job_id IN (${placeholders})`).bind(...jobIds)
+      ])
 
-      // Batch fetch departments
-      const { results: allDepts } = await db.prepare(
-        `SELECT job_id, name FROM job_departments WHERE job_id IN (${placeholders})`
-      ).bind(...jobIds).all()
+      const allTags = tagsRes.results as any[]
+      const allDepts = deptsRes.results as any[]
+      const allDegrees = degreesRes.results as any[]
+      const allSubjects = subjectsRes.results as any[]
 
       // Map results back to jobs
-      const tagMap = (allTags as any[]).reduce((acc, t) => {
+      const tagMap = allTags.reduce((acc, t) => {
         acc[t.job_id] = acc[t.job_id] || []
         acc[t.job_id].push(t.name)
         return acc
       }, {} as Record<string, string[]>)
 
-      const deptMap = (allDepts as any[]).reduce((acc, d) => {
+      const deptMap = allDepts.reduce((acc, d) => {
         acc[d.job_id] = acc[d.job_id] || []
         acc[d.job_id].push(d.name)
+        return acc
+      }, {} as Record<string, string[]>)
+
+      const degreeMap = allDegrees.reduce((acc, d) => {
+        acc[d.job_id] = acc[d.job_id] || []
+        acc[d.job_id].push(d.name)
+        return acc
+      }, {} as Record<string, string[]>)
+
+      const subjectMap = allSubjects.reduce((acc, s) => {
+        acc[s.job_id] = acc[s.job_id] || []
+        acc[s.job_id].push(s.name)
         return acc
       }, {} as Record<string, string[]>)
 
       for (const job of jobs) {
         job.tags = tagMap[job.id] || []
         job.departments = deptMap[job.id] || []
+        job.degree_levels = degreeMap[job.id] || []
+        job.subject_areas = subjectMap[job.id] || []
       }
     }
 
@@ -290,8 +344,8 @@ const ThemeToggle = () => (
 )
 
 const SearchFilters = ({ params, total, companyCount, latency }: { params: SearchParams; total: number; companyCount: number; latency: number }) => {
-  const { query, location, tag, source, posted } = params
-  const isFilterVisible = location || tag || source || posted
+  const { query, location, tag, source, posted, degree, field } = params
+  const isFilterVisible = location || tag || source || posted || degree || field
 
   return (
     <div class="search-container">
@@ -348,6 +402,26 @@ const SearchFilters = ({ params, total, companyCount, latency }: { params: Searc
             <div class="tag-input-container" id="tagTagContainer">
               <div class="tag-pills" id="tagPills"></div>
               <input type="text" class="tag-input-field" placeholder="e.g. Python, React" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Degree</label>
+            <select name="degree" class="filter-select">
+              <option value="">Any Degree</option>
+              <option value="Bachelor's" selected={degree === "Bachelor's"}>Bachelor's</option>
+              <option value="Master's" selected={degree === "Master's"}>Master's</option>
+              <option value="PhD" selected={degree === "PhD"}>PhD</option>
+              <option value="Associate's" selected={degree === "Associate's"}>Associate's</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Field of Study</label>
+            <input type="hidden" name="field" id="fieldInput" value={field || ''} />
+            <div class="tag-input-container" id="fieldTagContainer">
+              <div class="tag-pills" id="fieldPills"></div>
+              <input type="text" class="tag-input-field" placeholder="e.g. Computer Science" autocomplete="off" />
             </div>
           </div>
 
@@ -417,6 +491,18 @@ const DetailPanel = () => (
             <circle cx="12" cy="10" r="3"></circle>
           </svg>
           <span>Location</span>
+        </div>
+        <div class="panel-meta-item" id="panelDegree" style="display: none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+          <span>Degree</span>
+        </div>
+        <div class="panel-meta-item" id="panelField" style="display: none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span>Field</span>
+        </div>
+        <div class="panel-meta-item" id="panelDept" style="display: none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Department</span>
         </div>
         <div class="panel-meta-item" id="panelPosted">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -491,27 +577,24 @@ app.get('/api/job/:id', async (c) => {
   const id = c.req.param('id')
 
   try {
-    const { results } = await c.env.DB.prepare(
-      'SELECT * FROM jobs WHERE id = ?'
-    ).bind(id).all()
+    // Fetch job metadata and all relations in a single batch
+    const [jobRes, tagsRes, deptsRes, degreesRes, subjectsRes] = await c.env.DB.batch([
+      c.env.DB.prepare('SELECT * FROM jobs WHERE id = ?').bind(id),
+      c.env.DB.prepare('SELECT name FROM job_tags WHERE job_id = ?').bind(id),
+      c.env.DB.prepare('SELECT name FROM job_departments WHERE job_id = ?').bind(id),
+      c.env.DB.prepare('SELECT name FROM job_degree_levels WHERE job_id = ?').bind(id),
+      c.env.DB.prepare('SELECT name FROM job_subject_areas WHERE job_id = ?').bind(id)
+    ])
 
-    if (results.length === 0) {
+    if (jobRes.results.length === 0) {
       return c.json({ error: 'Job not found' }, 404)
     }
 
-    const job = results[0] as any
-
-    // Fetch tags
-    const { results: tags } = await c.env.DB.prepare(
-      'SELECT name FROM job_tags WHERE job_id = ?'
-    ).bind(id).all()
-    job.tags = tags.map((t: any) => t.name)
-
-    // Fetch departments
-    const { results: depts } = await c.env.DB.prepare(
-      'SELECT name FROM job_departments WHERE job_id = ?'
-    ).bind(id).all()
-    job.departments = depts.map((d: any) => d.name)
+    const job = jobRes.results[0] as any
+    job.tags = (tagsRes.results as any[]).map(t => t.name)
+    job.departments = (deptsRes.results as any[]).map(d => d.name)
+    job.degree_levels = (degreesRes.results as any[]).map(d => d.name)
+    job.subject_areas = (subjectsRes.results as any[]).map(s => s.name)
 
     return c.json(job)
   } catch (e) {

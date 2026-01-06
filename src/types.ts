@@ -9,4 +9,6 @@ export interface Job {
     ats: string
     tags?: string[]
     departments?: string[]
+    degree_levels?: string[]
+    subject_areas?: string[]
 }

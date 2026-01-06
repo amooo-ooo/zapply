@@ -72,6 +72,8 @@ pub struct Job {
     pub departments: Vec<String>,
     pub offices: Vec<String>,
     pub tags: Vec<String>,
+    pub degree_levels: Vec<String>,
+    pub subject_areas: Vec<String>,
 }
 
 // --- Specialized Response Structs ---

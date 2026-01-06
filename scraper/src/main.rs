@@ -16,7 +16,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::models::{Job, CompanyEntry, AtsType};
 use crate::parsers::AtsParser;
-use crate::tag::TagEngine;
+use crate::tag::{TagEngine, EducationDetector};
 
 // --- Configuration & Types ---
 
@@ -69,6 +69,19 @@ trait JobDb: Send + Sync {
                 ],
             });
 
+            for degree in &job.degree_levels {
+                queries.push(DbQuery {
+                    sql: "INSERT OR IGNORE INTO job_degree_levels (job_id, name) VALUES (?1, ?2)".to_string(),
+                    params: vec![Value::String(job.id.clone()), Value::String(degree.clone())],
+                });
+            }
+            for subject in &job.subject_areas {
+                queries.push(DbQuery {
+                    sql: "INSERT OR IGNORE INTO job_subject_areas (job_id, name) VALUES (?1, ?2)".to_string(),
+                    params: vec![Value::String(job.id.clone()), Value::String(subject.clone())],
+                });
+            }
+
             for dept in &job.departments {
                 queries.push(DbQuery {
                     sql: "INSERT OR IGNORE INTO job_departments (job_id, name) VALUES (?1, ?2)".to_string(),
@@ -118,7 +131,7 @@ impl JobDb for LocalWranglerD1 {
             sql.push_str("BEGIN TRANSACTION;\n");
             for query in chunk {
                 let mut statement = query.sql.clone();
-                for (i, param) in query.params.iter().enumerate() {
+                for (i, param) in query.params.iter().enumerate().rev() {
                     let placeholder = format!("?{}", i + 1);
                     let val_str = match param {
                         Value::String(s) => format!("'{}'", s.replace("'", "''")),
@@ -188,7 +201,7 @@ impl JobDb for RemoteD1 {
             let combined_sql: String = chunk.iter()
                 .map(|q| {
                     let mut statement = q.sql.clone();
-                    for (i, param) in q.params.iter().enumerate() {
+                    for (i, param) in q.params.iter().enumerate().rev() {
                         let placeholder = format!("?{}", i + 1);
                         let val_str = match param {
                             Value::String(s) => format!("'{}'", s.replace("'", "''")),
@@ -274,6 +287,7 @@ struct Scraper {
     cache: HashSet<String>,
     log_file: Option<Arc<Mutex<fs::File>>>,
     tag_engine: Arc<TagEngine>,
+    edu_detector: Arc<EducationDetector>,
 }
 
 impl Scraper {
@@ -284,10 +298,11 @@ impl Scraper {
             .build()?;
         let log_file = log_file.map(|f| Arc::new(Mutex::new(f)));
         let tag_engine = Arc::new(TagEngine::new());
-        Ok(Self { client, keyword_regex, cache, log_file, tag_engine })
+        let edu_detector = Arc::new(EducationDetector::new());
+        Ok(Self { client, keyword_regex, cache, log_file, tag_engine, edu_detector })
     }
 
-    async fn process_company(client: &reqwest::Client, company: &CompanyEntry, regex: &Regex, tag_engine: &TagEngine) -> Result<Vec<Job>> {
+    async fn process_company(client: &reqwest::Client, company: &CompanyEntry, regex: &Regex, tag_engine: &TagEngine, edu_detector: &EducationDetector) -> Result<Vec<Job>> {
         let mut url = company.api_url.clone();
         if company.ats_type == AtsType::Greenhouse && !url.contains("content=true") {
             url.push_str(if url.contains('?') { "&content=true" } else { "?content=true" });
@@ -303,11 +318,19 @@ impl Scraper {
         let filtered: Vec<Job> = jobs.into_iter()
             .filter(|j| regex.is_match(&j.title))
             .map(|mut j| {
+                // Detect tags
                 let mut unique_tags = HashSet::new();
                 unique_tags.extend(j.tags);
                 unique_tags.extend(tag_engine.detect_tags(&j.description).into_iter().map(String::from));
                 unique_tags.extend(tag_engine.detect_tags(&j.title).into_iter().map(String::from));
                 j.tags = unique_tags.into_iter().collect();
+                
+                // Detect education info
+                let combined_text = format!("{} {}", j.title, j.description);
+                let edu_info = edu_detector.detect(&combined_text);
+                j.degree_levels = edu_info.degree_levels;
+                j.subject_areas = edu_info.subject_areas;
+                
                 j
             })
             .collect();
@@ -329,6 +352,7 @@ impl Scraper {
         let jobs_count = Arc::new(AtomicUsize::new(0));
         let log_file = self.log_file.clone();
         let tag_engine = self.tag_engine.clone();
+        let edu_detector = self.edu_detector.clone();
 
         let results = stream::iter(companies)
             .map(|company| {
@@ -340,9 +364,10 @@ impl Scraper {
                 let log_file = log_file.clone();
                 let pb = pb.clone();
                 let tag_engine = tag_engine.clone();
+                let edu_detector = edu_detector.clone();
 
                 async move {
-                    let result = Self::process_company(&client, &company, &regex, &tag_engine).await;
+                    let result = Self::process_company(&client, &company, &regex, &tag_engine, &edu_detector).await;
                     let jobs = match result {
                         Ok(j) => {
                             success_count.fetch_add(1, Ordering::SeqCst);

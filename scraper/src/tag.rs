@@ -1,7 +1,6 @@
 use regex::RegexSet;
 
 
-/// Efficiently detects keywords in text and maps them to standardized tags.
 pub struct TagEngine {
     regex_set: RegexSet,
     rules: Vec<TagRule>,
@@ -19,7 +18,6 @@ struct TagRule {
 }
 
 impl TagEngine {
-    /// Creates a new `TagEngine` with predefined keywords. Panics on invalid regex.
     pub fn new() -> Self {
         let mut patterns = Vec::new();
         let mut rules = Vec::new();
@@ -203,7 +201,6 @@ impl TagEngine {
         Self { regex_set, rules }
     }
 
-    /// Detects tags in the given text.
     pub fn detect_tags(&self, text: &str) -> Vec<&'static str> {
 
         let matches = self.regex_set.matches(text);
@@ -241,7 +238,6 @@ impl TagEngine {
             .collect()
     }
     
-    /// Checks if keyword and context appear within `max_dist` words.
     fn check_distance(&self, text: &str, keyword_re: &regex::Regex, context_re: &regex::Regex, max_dist: usize, _match_must_exist: bool) -> bool {
         let keyword_indices: Vec<usize> = keyword_re.find_iter(text).map(|m| m.start()).collect();
         let context_indices: Vec<usize> = context_re.find_iter(text).map(|m| m.start()).collect();
@@ -251,12 +247,151 @@ impl TagEngine {
                 let (start, end) = if k_idx < c_idx { (k_idx, c_idx) } else { (c_idx, k_idx) };
                 let slice = &text[start..end];
 
-                if slice.split_whitespace().count() <= max_dist {
+                if count_words(slice) <= max_dist {
                     return true;
                 }
             }
         }
         false
+    }
+}
+
+fn count_words(s: &str) -> usize {
+    let mut count = 0;
+    let mut in_word = false;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            if in_word {
+                count += 1;
+                in_word = false;
+            }
+        } else {
+            in_word = true;
+        }
+    }
+    count
+}
+
+// === Education Detection ===
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EducationInfo {
+    pub degree_levels: Vec<String>,
+    pub subject_areas: Vec<String>,
+}
+
+pub struct EducationDetector {
+    regex_set: regex::RegexSet,
+    rules: Vec<EducationRule>,
+    context_regex: regex::Regex,
+}
+
+struct EducationRule {
+    tag: &'static str,
+    kind: EducationKind,
+}
+
+enum EducationKind {
+    Degree,
+    Subject,
+}
+
+impl EducationDetector {
+    pub fn new() -> Self {
+        let mut patterns = Vec::new();
+        let mut rules = Vec::new();
+
+        macro_rules! add_edu {
+            ($p:expr, $t:expr, $k:expr) => {
+                patterns.push($p.to_string());
+                rules.push(EducationRule {
+                    tag: $t,
+                    kind: $k,
+                });
+            };
+        }
+
+        macro_rules! degree {
+            ($p:expr, $t:expr) => { add_edu!($p, $t, EducationKind::Degree) }
+        }
+
+        macro_rules! subject {
+            ($p:expr, $t:expr) => { add_edu!($p, $t, EducationKind::Subject) }
+        }
+
+        // Degree levels
+        degree!(r"\b(bachelor'?s?|b\.?s\.?|b\.?a\.?|bsc|ba)\b", "Bachelor's");
+        degree!(r"\b(master'?s?|m\.?s\.?|m\.?a\.?|msc|ma|mba)\b", "Master's");
+        degree!(r"\b(ph\.?d\.?|doctorate|doctoral)\b", "PhD");
+        degree!(r"\b(associate'?s?|a\.?s\.?|a\.?a\.?)\b", "Associate's");
+
+        // Subject areas
+        subject!(r"\b(computer science|cs)\b", "Computer Science");
+        subject!(r"\b(software engineering)\b", "Software Engineering");
+        subject!(r"\b(business informatics|wirtschaftsinformatik)\b", "Business Informatics");
+        subject!(r"\binformatics\b", "Informatics");
+        subject!(r"\b(information systems|information technology|it)\b", "Information Systems");
+        subject!(r"\b(data science)\b", "Data Science");
+        subject!(r"\b(artificial intelligence|ai|machine learning)\b", "AI/ML");
+        subject!(r"\b(mathematics|math|maths)\b", "Mathematics");
+        subject!(r"\b(statistics)\b", "Statistics");
+        
+        // Business & Economics
+        subject!(r"\b(economics)\b", "Economics");
+        subject!(r"\b(business administration|bba|business studies)\b", "Business Administration");
+        subject!(r"\b(finance)\b", "Finance");
+        subject!(r"\b(accounting)\b", "Accounting");
+        subject!(r"\b(marketing)\b", "Marketing");
+        
+        // Engineering
+        subject!(r"\b(electrical engineering|ee)\b", "Electrical Engineering");
+        subject!(r"\b(mechanical engineering)\b", "Mechanical Engineering");
+        subject!(r"\b(engineering)\b", "Engineering");
+
+        let regex_set = regex::RegexSetBuilder::new(patterns)
+            .case_insensitive(true)
+            .build()
+            .expect("Invalid education regex set");
+
+        let context_regex = regex::RegexBuilder::new(
+            r"(?i)\b(studying|enrolled|pursuing|degree|student|graduate|graduating|completed|completing|working towards?|currently in|candidate|major|studies)\b"
+        )
+        .case_insensitive(true)
+        .build()
+        .expect("Invalid context regex");
+
+        Self {
+            regex_set,
+            rules,
+            context_regex,
+        }
+    }
+
+    pub fn detect(&self, text: &str) -> EducationInfo {
+        if !self.context_regex.is_match(text) {
+            return EducationInfo::default();
+        }
+
+        let mut info = EducationInfo::default();
+        let matches = self.regex_set.matches(text);
+
+        for index in matches {
+            let rule = &self.rules[index];
+            match rule.kind {
+                EducationKind::Degree => {
+                    if !info.degree_levels.contains(&rule.tag.to_string()) {
+                        info.degree_levels.push(rule.tag.to_string());
+                    }
+                }
+                EducationKind::Subject => {
+                    if !info.subject_areas.contains(&rule.tag.to_string()) {
+                        info.subject_areas.push(rule.tag.to_string());
+                    }
+                }
+            }
+        }
+
+        info
     }
 }
 
@@ -409,5 +544,89 @@ mod tests {
         assert!(engine.detect_tags("I know Java well.").contains(&"Java"));
         // "Java Script"
         assert!(!engine.detect_tags("I know Java Script.").contains(&"Java"));
+    }
+
+    // === Education Detection Tests ===
+
+    #[test]
+    fn test_education_degree_level() {
+        let detector = EducationDetector::new();
+        
+        // Bachelor's with context
+        let info = detector.detect("Currently enrolled in Bachelor's degree program");
+        assert!(info.degree_levels.contains(&"Bachelor's".to_string()));
+        
+        // Master's with context
+        let info = detector.detect("Pursuing a Master's in Computer Science");
+        assert!(info.degree_levels.contains(&"Master's".to_string()));
+        
+        // PhD
+        let info = detector.detect("Ph.D. candidate in Data Science");
+        assert!(info.degree_levels.contains(&"PhD".to_string()));
+    }
+
+    #[test]
+    fn test_education_subject_area() {
+        let detector = EducationDetector::new();
+        
+        // Computer Science
+        let info = detector.detect("Student studying Computer Science");
+        assert!(info.subject_areas.contains(&"Computer Science".to_string()));
+        
+        // Business Informatics
+        let info = detector.detect("Enrolled in Business Informatics degree");
+        assert!(info.subject_areas.contains(&"Business Informatics".to_string()));
+        
+        // Informatics
+        let info = detector.detect("Pursuing studies in Informatics");
+        assert!(info.subject_areas.contains(&"Informatics".to_string()));
+    }
+
+    #[test]
+    fn test_education_combined() {
+        let detector = EducationDetector::new();
+        
+        // Both degree and subject
+        let info = detector.detect("Currently pursuing a Master's degree in Computer Science");
+        assert!(info.degree_levels.contains(&"Master's".to_string()));
+        assert!(info.subject_areas.contains(&"Computer Science".to_string()));
+    }
+
+    #[test]
+    fn test_education_multiple() {
+        let detector = EducationDetector::new();
+        
+        // Multiple subjects
+        let info = detector.detect("Studying a degree in Computer Science and Mathematics");
+        assert!(info.subject_areas.contains(&"Computer Science".to_string()));
+        assert!(info.subject_areas.contains(&"Mathematics".to_string()));
+
+        // Multiple degrees
+        let info = detector.detect("Candidate for Bachelor's or Master's in Computer Science");
+        assert!(info.degree_levels.contains(&"Bachelor's".to_string()));
+        assert!(info.degree_levels.contains(&"Master's".to_string()));
+    }
+
+    #[test]
+    fn test_education_requires_context() {
+        let detector = EducationDetector::new();
+        
+        // No context = no detection
+        let info = detector.detect("We use Computer Science principles here");
+        assert!(info.degree_levels.is_empty());
+        assert!(info.subject_areas.is_empty());
+        
+        // With context = detection works
+        let info = detector.detect("We require a student studying Computer Science");
+        assert!(info.subject_areas.contains(&"Computer Science".to_string()));
+    }
+
+    #[test]
+    fn test_education_no_false_positives() {
+        let detector = EducationDetector::new();
+        
+        // Random text without education context
+        let info = detector.detect("We are a technology company building great products");
+        assert_eq!(info, EducationInfo::default());
     }
 }
