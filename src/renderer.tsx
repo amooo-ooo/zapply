@@ -1,5 +1,5 @@
 import { jsxRenderer } from 'hono/jsx-renderer'
-import { Link, ViteClient } from 'vite-ssr-components/hono'
+import { Link, Script, ViteClient } from 'vite-ssr-components/hono'
 
 export const renderer = jsxRenderer(({ children }) => {
   return (
@@ -31,7 +31,7 @@ export const renderer = jsxRenderer(({ children }) => {
             `,
           }}
         />
-        <script type="module" src="/src/client.ts"></script>
+        <Script src="/src/client.ts" />
         <title>Zapply | Early Career Roles</title>
       </head>
       <body>
