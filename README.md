@@ -1,21 +1,66 @@
-```txt
-npm install
-npm run dev
+# zapply
+
+zapply is an internship and early career search engine for students for the competitive job market. zapply aggregates opportunities and tags relevant roles directly from company ATS systems and other job boards.
+
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="zapply Screenshot" width="750">
+</p>
+
+> [!INFO]
+> Project still in heavy development.
+
+## Features
+
+- **High-performance Scraper**: Rust-based scraper for multiple ATS platforms (Greenhouse, Lever, etc.).
+- **Tagging**: Regex-based tagging for role types, degree levels, and subject areas.
+- **Modern UI**: Fast, mobile-ready frontend built with Hono and Vite.
+- **Powered by Cloudflare**: Powered by Cloudflare Workers and D1 for scalable, edge-based performance.
+
+## Tech Stack
+
+- **Frontend**: Hono, Vite, TypeScript, CSS
+- **Scraper**: Rust, Tokio, Reqwest, Serde
+- **Database**: Cloudflare D1
+
+## Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) (or npm/node)
+- [Rust](https://www.rust-lang.org/) (for the scraper)
+- [Wrangler](https://developers.cloudflare.com/workers/wrangler/) (Cloudflare CLI)
+
+### Installation & Development
+
+1. **Install dependencies**:
+```bash
+bun install
 ```
 
-```txt
-npm run deploy
+2. **Set up the database**:
+```bash
+wrangler d1 create zapply
+bun run db:setup
 ```
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
-
-```txt
-npm run cf-typegen
+3. **Run the development server**:
+```bash
+bun run dev
 ```
 
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
+4. **Run Scraper**:
+```bash
+bun run scrape:slugs
+bun run scrape
+```
 
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
+## Deployment
+
+Deploy to Cloudflare Workers:
+```bash
+wrangler d1 create zapply --remote
+bun run db:setup --remote
+bun run scrape:slugs --prod
+bun run scrape --prod
+bun run deploy
 ```
