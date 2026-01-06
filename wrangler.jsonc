@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zapply",
+  "compatibility_date": "2025-08-03",
+  "main": "./src/index.tsx",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zapply",
+      "database_id": "b00cacad-484c-4f5a-88a2-f769b11703b9"
+    }
+  ]
+}

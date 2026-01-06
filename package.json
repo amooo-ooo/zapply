@@ -1,0 +1,26 @@
+{
+  "name": "zapply",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "$npm_execpath run build && vite preview",
+    "deploy": "$npm_execpath run build && wrangler deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:setup": "wrangler d1 execute zapply --file=db/schema.sql",
+    "scrape": "cd scraper && cargo run --",
+    "scrape:slugs": "bun scraper/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.11.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.2.3",
+    "@cloudflare/workers-types": "^4.20260103.0",
+    "@types/node": "^25.0.3",
+    "playwright": "^1.57.0",
+    "vite": "^6.3.5",
+    "vite-ssr-components": "^0.5.2",
+    "wrangler": "^4.17.0"
+  }
+}
