@@ -1,7 +1,14 @@
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { Link, Script, ViteClient } from 'vite-ssr-components/hono'
 
-export const renderer = jsxRenderer(({ children }) => {
+declare module 'hono' {
+  interface ContextRenderer {
+    (content: string | Promise<string>, props?: { logoDevToken?: string }): Response | Promise<Response>
+  }
+}
+
+export const renderer = jsxRenderer(({ children, logoDevToken }: { children?: any, logoDevToken?: string }) => {
+  // @ts-ignore - logoDevToken is passed from c.render
   return (
     <html>
       <head>
@@ -39,7 +46,6 @@ export const renderer = jsxRenderer(({ children }) => {
 
                   // Pre-define theme colors if possible to avoid flash
                   // This matches the PALETTES constant in client.ts
-                  var palettes = {
                   var palettes = {
                     zinc: { 
                         light: '#fafafa', dark: '#09090b', 
@@ -141,7 +147,7 @@ export const renderer = jsxRenderer(({ children }) => {
         <meta name="twitter:description" content="Internship & early career search engine for students." />
         <meta name="twitter:image" content="/og-image.png" />
       </head>
-      <body>
+      <body data-logo-dev-token={logoDevToken as string}>
         <div class="app-layout">
           {children}
         </div>

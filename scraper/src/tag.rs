@@ -131,7 +131,6 @@ impl TagEngine {
         simple!(r"(?i)\bgraphic design\b", "Graphic Design");
 
         // === Marketing & Sales (Strict) ===
-        // Must be associated with role-specific keywords, not just company description
         strict_dist!(r"(?i)\bseo\b", "SEO", r"(?i)\b(specialist|optimization|ranking|keyword|content|audit|technical)\b", 15);
         strict_dist!(r"(?i)\bsem\b", "SEM", r"(?i)\b(paid|search|marketing|campaign|ppc|ad)\b", 15);
         simple!(r"(?i)\bcontent marketing\b", "Content Marketing");
@@ -145,6 +144,135 @@ impl TagEngine {
         strict_dist!(r"(?i)\bcro\b|conversion rate optimization\b", "CRO", r"(?i)\b(optimization|experiment|testing|growth|marketing)\b", 15);
         strict_dist!(r"(?i)\bppc\b|pay[-\s]per[-\s]click\b", "PPC", r"(?i)\b(campaign|ad|paid|marketing|search)\b", 15);
         strict_dist!(r"(?i)\bgtm\b|go[-\s]to[-\s]market\b", "Go-to-Market", r"(?i)\b(launch|product|market|sales)\b", 15);
+        
+        // Software Engineering & DevOps
+        simple!(r"(?i)\bjenkins\b", "Jenkins");
+        simple!(r"(?i)\bgitlab\b", "GitLab");
+        simple!(r"(?i)\bgithub actions\b", "GitHub Actions");
+        simple!(r"(?i)\bcircleci\b", "CircleCI");
+        simple!(r"(?i)\bansible\b", "Ansible");
+        simple!(r"(?i)\bpulumi\b", "Pulumi");
+        simple!(r"(?i)\bprometheus\b", "Prometheus");
+        simple!(r"(?i)\bgrafana\b", "Grafana");
+        simple!(r"(?i)\belk stack\b|\belasticsearch\b", "Elasticsearch");
+        simple!(r"(?i)\bsplunk\b", "Splunk");
+        simple!(r"(?i)\bnginx\b", "NGINX");
+        simple!(r"(?i)\bapache\b", "Apache");
+        simple!(r"(?i)\bserverless\b", "Serverless");
+        simple!(r"(?i)\bcassandra\b", "Cassandra");
+        simple!(r"(?i)\bmongodb\b", "MongoDB");
+        simple!(r"(?i)\bmariadb\b", "MariaDB");
+        strict_dist!(r"(?i)\bsnowflake\b", "Snowflake", r"(?i)\b(data|lake|warehouse|cloud|analytics|sql|computing)\b", 15);
+        simple!(r"(?i)\bdatabricks\b", "Databricks");
+        simple!(r"(?i)\bbigquery\b", "BigQuery");
+        simple!(r"(?i)\bairflow\b", "Airflow");
+        simple!(r"(?i)\bdbt\b", "dbt");
+
+        // Telehealth & Health IT
+        simple!(r"(?i)\btelehealth\b|\btelemedicine\b", "Telehealth");
+        strict_dist!(r"(?i)\bepic\b", "Epic Systems", r"(?i)\b(systems|electronic|health|record|software|ehr|emr|certified|analyst|telehealth|platform)\b", 15);
+        simple!(r"(?i)\bcerner\b", "Cerner");
+        simple!(r"(?i)\behr\b|\bemr\b", "EHR/EMR");
+        simple!(r"(?i)\bhl7\b", "HL7");
+        simple!(r"(?i)\bfhir\b", "FHIR");
+        simple!(r"(?i)\bdicom\b", "DICOM");
+        simple!(r"(?i)\bpacs\b", "PACS");
+        strict_dist!(r"(?i)\bhipaa\b", "HIPAA Compliance", r"(?i)\b(compliance|security|privacy|regulation|standards|training)\b", 15);
+        simple!(r"(?i)\bmedtech\b", "MedTech");
+        simple!(r"(?i)\bbiotech\b", "Biotech");
+        simple!(r"(?i)\bbioinformatics\b", "Bioinformatics");
+        simple!(r"(?i)\bclinical trials\b", "Clinical Trials");
+        simple!(r"(?i)\bpharmacovigilance\b", "Pharmacovigilance");
+
+        // Business Technologies & SaaS
+        simple!(r"(?i)\bsap\b", "SAP");
+        simple!(r"(?i)\boracle erp\b", "Oracle ERP");
+        simple!(r"(?i)\bnetsuite\b", "NetSuite");
+        simple!(r"(?i)\bworkday\b", "Workday");
+        simple!(r"(?i)\bservicenow\b", "ServiceNow");
+        simple!(r"(?i)\bhubspot\b", "HubSpot");
+        simple!(r"(?i)\bmarketo\b", "Marketo");
+        simple!(r"(?i)\bpardot\b", "Pardot");
+        simple!(r"(?i)\bzendesk\b", "Zendesk");
+        simple!(r"(?i)\bintercom\b", "Intercom");
+        simple!(r"(?i)\bshopify\b", "Shopify");
+        simple!(r"(?i)\bmagento\b", "Magento");
+        simple!(r"(?i)\bwoo?commerce\b", "WooCommerce");
+        simple!(r"(?i)\bslack\b", "Slack");
+        simple!(r"(?i)\bmicrosoft teams\b", "MS Teams");
+        simple!(r"(?i)\bjira\b", "Jira");
+        simple!(r"(?i)\bconfluence\b", "Confluence");
+        simple!(r"(?i)\btrello\b", "Trello");
+        simple!(r"(?i)\basana\b", "Asana");
+        simple!(r"(?i)\bmonday\.com\b", "Monday.com");
+        simple!(r"(?i)\bnotion\b", "Notion");
+
+        // Design & Creative
+        simple!(r"(?i)\badobe (creative cloud|suite)\b", "Adobe CC");
+        simple!(r"(?i)\bphotoshop\b", "Photoshop");
+        simple!(r"(?i)\billustrator\b", "Illustrator");
+        simple!(r"(?i)\bindesign\b", "InDesign");
+        simple!(r"(?i)\bafter effects\b", "After Effects");
+        simple!(r"(?i)\bpremiere pro\b", "Premiere Pro");
+        simple!(r"(?i)\bcanva\b", "Canva");
+        simple!(r"(?i)\bwebflow\b", "Webflow");
+        simple!(r"(?i)\bblender\b", "Blender");
+        strict_dist!(r"(?i)\bunity(3d)?\b", "Unity", r"(?i)\b(engine|game|developer|developing|design|c#|real[-\s]time|vr|ar)\b", 15);
+        simple!(r"(?i)\bunreal engine\b", "Unreal Engine");
+
+        // Engineering & Science
+        simple!(r"(?i)\brobotics\b", "Robotics");
+        strict_dist!(r"(?i)\bros\b", "ROS", r"(?i)\b(robot|robotics|operating|system|kinematics|navigation|control|developer|simulation)\b", 15);
+        strict_dist!(r"(?i)\bcad\b", "CAD", r"(?i)\b(computer|aided|design|software|autocad|solidworks|modelling|drawing|drafting|technical)\b", 15);
+        simple!(r"(?i)\bsolidworks\b", "SolidWorks");
+        simple!(r"(?i)\bautocad\b", "AutoCAD");
+        strict_dist!(r"(?i)\bmatlab\b", "MATLAB", r"(?i)\b(simulation|programming|script|algorithm|signal|processing|mathworks|academic|experience|familiarity)\b", 15);
+        simple!(r"(?i)\blabview\b", "LabVIEW");
+        strict_dist!(r"(?i)\bfpga\b", "FPGA", r"(?i)\b(design|verilog|vhdl|logic|hardware|circuit|programmable|gate)\b", 15);
+        simple!(r"(?i)\bverilog\b", "Verilog");
+        simple!(r"(?i)\bvhdl\b", "VHDL");
+        strict_dist!(r"(?i)\brtos\b|real[-\s]time operating system\b", "RTOS", r"(?i)\b(embedded|kernel|task|scheduler|interrupt|thread|safety|critical)\b", 15);
+        simple!(r"(?i)\bembedded c\b", "Embedded C");
+        strict_dist!(r"(?i)\bplc\b|programmable logic controller\b", "PLC", r"(?i)\b(automation|control|industrial|programming|ladder|logic|scada|hmi)\b", 15);
+        simple!(r"(?i)\bscada\b", "SCADA");
+        simple!(r"(?i)\bansys\b", "ANSYS");
+
+        // Finance & Data
+        simple!(r"(?i)\bbloomberg\b", "Bloomberg Terminal");
+        simple!(r"(?i)\bfactset\b", "FactSet");
+        simple!(r"(?i)\bcapitalline\b", "CapitalLine");
+        simple!(r"(?i)\bmorningstar\b", "Morningstar");
+        strict_dist!(r"(?i)\bstata\b", "STATA", r"(?i)\b(statistical|data|analysis|research|quantitative|survey|econometrics)\b", 15);
+        strict_dist!(r"(?i)\bsas\b", "SAS", r"(?i)\b(statistical|programming|data|analytics|business|intelligence|software)\b", 15);
+        simple!(r"(?i)\bblockchain\b", "Blockchain");
+        simple!(r"(?i)\bsolidity\b", "Solidity");
+        simple!(r"(?i)\bsmart contracts\b", "Smart Contracts");
+        simple!(r"(?i)\bethereum\b", "Ethereum");
+        simple!(r"(?i)\bbitcoin\b", "Bitcoin");
+        simple!(r"(?i)\bdefi\b|decentralized finance\b", "DeFi");
+        simple!(r"(?i)\bnft\b", "NFT");
+
+        // Operations & General Jargon
+        strict_dist!(r"(?i)\bagile\b", "Agile", r"(?i)\b(scrum|kanban|methodology|environment|team|workflow|sprint|coach|practice|principles)\b", 15);
+        simple!(r"(?i)\bscrum\b", "Scrum");
+        simple!(r"(?i)\bkanban\b", "Kanban");
+        strict_dist!(r"(?i)\blean\b", "Lean", r"(?i)\b(manufacturing|six sigma|process|production|principles|management|improvement|startup)\b", 15);
+        simple!(r"(?i)\bsix sigma\b", "Six Sigma");
+        simple!(r"(?i)\bproject management professional\b|\bpmp\b", "PMP");
+        strict_dist!(r"(?i)\bpr\b", "Public Relations", r"(?i)\b(relations|media|communications|campaign|press|outreach|social|strategy)\b", 15);
+        simple!(r"(?i)\bcopywriting\b", "Copywriting");
+        simple!(r"(?i)\btechnical writing\b", "Technical Writing");
+        simple!(r"(?i)\bgrant writing\b", "Grant Writing");
+        simple!(r"(?i)\bcorporate social responsibility\b|\bcsr\b", "CSR");
+        simple!(r"(?i)\besg\b|environmental social governance\b", "ESG");
+        simple!(r"(?i)\bcustomer success\b", "Customer Success");
+        strict_dist!(r"(?i)\bsaas\b", "SaaS", r"(?i)\b(software|platform|cloud|delivery|product|business|model|sales)\b", 15);
+        simple!(r"(?i)\bpaas\b|platform as a service\b", "PaaS");
+        simple!(r"(?i)\biaas\b|infrastructure as a service\b", "IaaS");
+        simple!(r"(?i)\bfinops\b", "FinOps");
+        simple!(r"(?i)\brevops\b", "RevOps");
+        simple!(r"(?i)\bmarkops\b", "MarkOps");
+        simple!(r"(?i)\bsalesops\b", "SalesOps");
         
         strict_dist!(r"(?i)\bb2b\b", "B2B", r"(?i)\b(sales|marketing|saas|client|account|business)\b", 15);
         strict_dist!(r"(?i)\bb2c\b", "B2C", r"(?i)\b(consumer|marketing|sales|brand|customer|retail)\b", 15);
@@ -346,7 +474,44 @@ impl EducationDetector {
         // Engineering
         subject!(r"\b(electrical engineering|ee)\b", "Electrical Engineering");
         subject!(r"\b(mechanical engineering)\b", "Mechanical Engineering");
+        subject!(r"\b(civil engineering)\b", "Civil Engineering");
+        subject!(r"\b(chemical engineering)\b", "Chemical Engineering");
+        subject!(r"\b(biomedical engineering)\b", "Biomedical Engineering");
+        subject!(r"\b(aerospace engineering)\b", "Aerospace Engineering");
+        subject!(r"\b(industrial engineering)\b", "Industrial Engineering");
         subject!(r"\b(engineering)\b", "Engineering");
+        
+        // Science
+        subject!(r"\bphysics\b", "Physics");
+        subject!(r"\bchemistry\b", "Chemistry");
+        subject!(r"\b(biology|biological sciences)\b", "Biology");
+        subject!(r"\b(biochemistry|molecular biology)\b", "Biochemistry");
+        subject!(r"\b(biotechnology|biotech)\b", "Biotechnology");
+        subject!(r"\b(environmental science|ecology)\b", "Environmental Science");
+        subject!(r"\b(geology|earth science)\b", "Geology");
+        subject!(r"\b(psychology|behavioral science)\b", "Psychology");
+        subject!(r"\b(neuroscience)\b", "Neuroscience");
+
+        // Social Sciences & Humanities
+        subject!(r"\b(economics|political economy)\b", "Economics");
+        subject!(r"\b(political science|government|politics)\b", "Political Science");
+        subject!(r"\b(sociology)\b", "Sociology");
+        subject!(r"\b(anthropology)\b", "Anthropology");
+        subject!(r"\b(international relations|global affairs)\b", "International Relations");
+        subject!(r"\b(history)\b", "History");
+        subject!(r"\b(philosophy)\b", "Philosophy");
+        subject!(r"\b(english|literature|creative writing)\b", "English");
+        subject!(r"\b(communications|media studies|journalism)\b", "Communications");
+        subject!(r"\b(linguistics)\b", "Linguistics");
+        subject!(r"\b(arts?|fine arts|visual arts|art history)\b", "Arts");
+        subject!(r"\b(music|musicology)\b", "Music");
+
+        // Professional & Other
+        subject!(r"\b(architecture)\b", "Architecture");
+        subject!(r"\b(law|legal studies|jurisprudence)\b", "Law");
+        subject!(r"\b(education|teaching|pedagogy)\b", "Education");
+        subject!(r"\b(nursing|healthcare administration|public health)\b", "Healthcare");
+        subject!(r"\b(social work)\b", "Social Work");
 
         let regex_set = regex::RegexSetBuilder::new(patterns)
             .case_insensitive(true)
@@ -628,5 +793,98 @@ mod tests {
         // Random text without education context
         let info = detector.detect("We are a technology company building great products");
         assert_eq!(info, EducationInfo::default());
+    }
+
+    #[test]
+    fn test_telehealth_tags() {
+        let engine = TagEngine::new();
+        let text = "Seeking a developer for our telehealth platform. Experience with Epic, Cerner, and HL7/FHIR is required. Knowledge of HIPAA compliance is a must.";
+        let tags = engine.detect_tags(text);
+        let tags_set: HashSet<_> = tags.iter().cloned().collect();
+
+        assert!(tags_set.contains("Telehealth"));
+        assert!(tags_set.contains("Epic Systems"));
+        assert!(tags_set.contains("Cerner"));
+        assert!(tags_set.contains("HL7"));
+        assert!(tags_set.contains("FHIR"));
+        assert!(tags_set.contains("HIPAA Compliance"));
+    }
+
+    #[test]
+    fn test_business_tech_tags() {
+        let engine = TagEngine::new();
+        let text = "We use HubSpot for marketing, Zendesk for support, and Jira/Confluence for project management. Experience with SAP or Oracle ERP is a plus.";
+        let tags = engine.detect_tags(text);
+        let tags_set: HashSet<_> = tags.iter().cloned().collect();
+
+        assert!(tags_set.contains("HubSpot"));
+        assert!(tags_set.contains("Zendesk"));
+        assert!(tags_set.contains("Jira"));
+        assert!(tags_set.contains("Confluence"));
+        assert!(tags_set.contains("SAP"));
+        assert!(tags_set.contains("Oracle ERP"));
+    }
+
+    #[test]
+    fn test_engineering_science_tags() {
+        let engine = TagEngine::new();
+        let text = "Position requires experience with Robotics, ROS, and CAD (SolidWorks/AutoCAD). Familiarity with MATLAB and FPGA (Verilog/VHDL) is desired.";
+        let tags = engine.detect_tags(text);
+        let tags_set: HashSet<_> = tags.iter().cloned().collect();
+
+        assert!(tags_set.contains("Robotics"));
+        assert!(tags_set.contains("ROS"));
+        assert!(tags_set.contains("CAD"));
+        assert!(tags_set.contains("SolidWorks"));
+        assert!(tags_set.contains("AutoCAD"));
+        assert!(tags_set.contains("MATLAB"));
+        assert!(tags_set.contains("FPGA"));
+        assert!(tags_set.contains("Verilog"));
+        assert!(tags_set.contains("VHDL"));
+    }
+
+    #[test]
+    fn test_expanded_education_subjects() {
+        let detector = EducationDetector::new();
+        
+        // Physics and Chemistry
+        let info = detector.detect("Student pursuing a degree in Physics and Chemistry");
+        assert!(info.subject_areas.contains(&"Physics".to_string()));
+        assert!(info.subject_areas.contains(&"Chemistry".to_string()));
+
+        // Psychology and Sociology
+        let info = detector.detect("Candidate studying Psychology or Sociology");
+        assert!(info.subject_areas.contains(&"Psychology".to_string()));
+        assert!(info.subject_areas.contains(&"Sociology".to_string()));
+
+        // Architecture and Law
+        let info = detector.detect("Enrolled in Architecture or Law studies");
+        assert!(info.subject_areas.contains(&"Architecture".to_string()));
+        assert!(info.subject_areas.contains(&"Law".to_string()));
+    }
+
+    #[test]
+    fn test_strict_new_rules() {
+        let engine = TagEngine::new();
+        
+        // Snowflake
+        assert!(engine.detect_tags("Experience with Snowflake data warehouse").contains(&"Snowflake"));
+        assert!(!engine.detect_tags("I found a beautiful snowflake").contains(&"Snowflake"));
+
+        // Epic
+        assert!(engine.detect_tags("Epic Systems EHR certification").contains(&"Epic Systems"));
+        assert!(!engine.detect_tags("That was an epic fail").contains(&"Epic Systems"));
+
+        // Unity
+        assert!(engine.detect_tags("Unity game engine developer").contains(&"Unity"));
+        assert!(!engine.detect_tags("Call for national unity").contains(&"Unity"));
+
+        // CAD
+        assert!(engine.detect_tags("Proficient in CAD software").contains(&"CAD"));
+        assert!(!engine.detect_tags("The cad was very rude").contains(&"CAD"));
+
+        // Agile
+        assert!(engine.detect_tags("Working in an Agile scrum environment").contains(&"Agile"));
+        assert!(!engine.detect_tags("He is very agile on his feet").contains(&"Agile"));
     }
 }

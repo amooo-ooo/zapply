@@ -81,6 +81,7 @@ impl AtsType {
             slug: company.slug.clone(),
             ats: *self,
             url,
+            company_url: company.domain.clone(),
             location: String::new(),
             posted: String::new(),
             departments: vec![],

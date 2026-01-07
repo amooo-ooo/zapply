@@ -2,9 +2,12 @@ import { Hono } from 'hono'
 import { renderer } from './renderer'
 import type { Job } from './types'
 
+import { cache } from 'hono/cache'
+
 type Env = {
   Bindings: {
     DB: D1Database
+    LOGO_DEV_TOKEN: string
   }
 }
 
@@ -20,6 +23,11 @@ type SearchParams = {
 }
 
 const app = new Hono<Env>()
+
+app.use('*', cache({
+  cacheName: 'zapply-cache',
+  cacheControl: 'max-age=60',
+}))
 
 app.use(renderer)
 
@@ -73,15 +81,52 @@ const formatLocation = (loc: string) => {
   return loc.trim()
 }
 
-const JobCard = ({ job }: { job: Job }) => {
+
+
+const JobCard = ({ job, token }: { job: Job; token: string }) => {
   const iconLetter = job.company ? job.company.charAt(0) : '?'
+
+  // Resolve logo query dynamically
+  let logoQuery = job.company.replace(/-/g, '')
+  if (job.company_url) {
+    try {
+      const urlStr = job.company_url.startsWith('http') ? job.company_url : `https://${job.company_url}`
+      logoQuery = new URL(urlStr).hostname
+    } catch (e) {
+      // Use fallback (dash-removed company name)
+    }
+  }
+
+  const logoUrl = `https://img.logo.dev/${encodeURIComponent(logoQuery)}?token=${token}`
 
   return (
     <div class="job-card" data-job-id={job.id}>
       <div class="card-header">
         <div class="company-info">
-          <div class="company-icon">{iconLetter}</div>
-          <div class="company-name">{job.company}</div>
+          <div class="company-icon">
+            <img
+              src={logoUrl}
+              alt={job.company}
+              loading="lazy"
+              style="display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 6px;"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
+            />
+            <span style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center;">{iconLetter}</span>
+          </div>
+          <div class="company-name">
+            {job.company_url ? (
+              <a
+                href={job.company_url.startsWith('http') ? job.company_url : `https://${job.company_url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style="text-decoration: none; color: inherit;"
+              >
+                {job.company}
+              </a>
+            ) : (
+              job.company
+            )}
+          </div>
         </div>
         <div class="header-right">
           {job.posted && (
@@ -100,29 +145,41 @@ const JobCard = ({ job }: { job: Job }) => {
 
       <div class="card-body">
         <h3 class="job-title">{job.title}</h3>
-        <div class="location-row">
-          {job.location && job.location.split(';').map((loc: string) => loc.trim()).filter(Boolean).map((loc: string) => (
-            <div class="dashed-tag">
+
+        <div class="job-metadata">
+          {job.location && (
+            <div class="metadata-item">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
               </svg>
-              {formatLocation(loc)}
+              <span>{job.location.split(';').map((loc: string) => formatLocation(loc.trim())).filter(Boolean).join(', ')}</span>
             </div>
-          ))}
-          {job.degree_levels?.map((degree: string) => (
-            <span class="dashed-tag" title="Degree Level">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
-              {degree}
-            </span>
-          ))}
-          {job.subject_areas?.map((area: string) => (
-            <span class="dashed-tag" title="Field of Study">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-              {area}
-            </span>
-          ))}
-          {job.tags?.slice(0, 7).map((tag: string) => {
+          )}
+
+          {job.degree_levels && job.degree_levels.length > 0 && (
+            <div class="metadata-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+              </svg>
+              <span>{job.degree_levels.join(', ')}</span>
+            </div>
+          )}
+
+          {job.subject_areas && job.subject_areas.length > 0 && (
+            <div class="metadata-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+              <span>{job.subject_areas.join(', ')}</span>
+            </div>
+          )}
+        </div>
+
+        <div class="tag-row">
+          {job.tags?.slice(0, 10).map((tag: string) => {
             const isRainbow = tag.toUpperCase().includes('LGBTQ')
             return (
               <span
@@ -133,8 +190,8 @@ const JobCard = ({ job }: { job: Job }) => {
               </span>
             )
           })}
-          {(job.tags?.length || 0) > 7 && (
-            <span class="tag tag-more">+{job.tags!.length - 7}</span>
+          {(job.tags?.length || 0) > 10 && (
+            <span class="tag tag-more">+{job.tags!.length - 10}</span>
           )}
         </div>
       </div>
@@ -148,7 +205,6 @@ const JobCard = ({ job }: { job: Job }) => {
     </div>
   )
 }
-
 const getSearchParams = (c: any): SearchParams => {
   return {
     query: c.req.query('q'),
@@ -247,13 +303,24 @@ const getJobs = async (
     }
   }
 
-  // Consolidated Counts and Data query
+  // Consolidated Counts and Data query with JSON aggregation
   const countSql = `SELECT COUNT(*) as total FROM jobs ${whereClause}`
   const companyCountSql = `SELECT COUNT(DISTINCT company) as total FROM jobs ${whereClause}`
-  const dataSql = `SELECT id, title, company, slug, ats, url, location, posted, created_at FROM jobs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+  const dataSql = `
+    SELECT 
+      j.id, j.title, j.company, j.slug, j.ats, j.url, j.company_url, j.location, j.posted, j.created_at,
+      (SELECT json_group_array(name) FROM job_tags WHERE job_id = j.id) as tags,
+      (SELECT json_group_array(name) FROM job_departments WHERE job_id = j.id) as departments,
+      (SELECT json_group_array(name) FROM job_degree_levels WHERE job_id = j.id) as degree_levels,
+      (SELECT json_group_array(name) FROM job_subject_areas WHERE job_id = j.id) as subject_areas
+    FROM jobs j
+    ${whereClause}
+    ORDER BY j.created_at DESC 
+    LIMIT ? OFFSET ?
+  `
 
   try {
-    // Execute counts and data query in a single batch
+    // Execute all in a single batch
     const [countRes, companyRes, dataRes] = await db.batch([
       db.prepare(countSql).bind(...sqlParams),
       db.prepare(companyCountSql).bind(...sqlParams),
@@ -262,57 +329,14 @@ const getJobs = async (
 
     const total = (countRes.results[0] as any).total
     const companyCount = (companyRes.results[0] as any).total
-    const jobs = dataRes.results as unknown as Job[]
 
-    if (jobs.length > 0) {
-      const jobIds = jobs.map(j => j.id)
-      const placeholders = jobIds.map(() => '?').join(',')
-
-      // Batch fetch all relations in a second batch
-      const [tagsRes, deptsRes, degreesRes, subjectsRes] = await db.batch([
-        db.prepare(`SELECT job_id, name FROM job_tags WHERE job_id IN (${placeholders})`).bind(...jobIds),
-        db.prepare(`SELECT job_id, name FROM job_departments WHERE job_id IN (${placeholders})`).bind(...jobIds),
-        db.prepare(`SELECT job_id, name FROM job_degree_levels WHERE job_id IN (${placeholders})`).bind(...jobIds),
-        db.prepare(`SELECT job_id, name FROM job_subject_areas WHERE job_id IN (${placeholders})`).bind(...jobIds)
-      ])
-
-      const allTags = tagsRes.results as any[]
-      const allDepts = deptsRes.results as any[]
-      const allDegrees = degreesRes.results as any[]
-      const allSubjects = subjectsRes.results as any[]
-
-      // Map results back to jobs
-      const tagMap = allTags.reduce((acc, t) => {
-        acc[t.job_id] = acc[t.job_id] || []
-        acc[t.job_id].push(t.name)
-        return acc
-      }, {} as Record<string, string[]>)
-
-      const deptMap = allDepts.reduce((acc, d) => {
-        acc[d.job_id] = acc[d.job_id] || []
-        acc[d.job_id].push(d.name)
-        return acc
-      }, {} as Record<string, string[]>)
-
-      const degreeMap = allDegrees.reduce((acc, d) => {
-        acc[d.job_id] = acc[d.job_id] || []
-        acc[d.job_id].push(d.name)
-        return acc
-      }, {} as Record<string, string[]>)
-
-      const subjectMap = allSubjects.reduce((acc, s) => {
-        acc[s.job_id] = acc[s.job_id] || []
-        acc[s.job_id].push(s.name)
-        return acc
-      }, {} as Record<string, string[]>)
-
-      for (const job of jobs) {
-        job.tags = tagMap[job.id] || []
-        job.departments = deptMap[job.id] || []
-        job.degree_levels = degreeMap[job.id] || []
-        job.subject_areas = subjectMap[job.id] || []
-      }
-    }
+    const jobs = dataRes.results.map((row: any) => ({
+      ...row,
+      tags: JSON.parse(row.tags || '[]'),
+      departments: JSON.parse(row.departments || '[]'),
+      degree_levels: JSON.parse(row.degree_levels || '[]'),
+      subject_areas: JSON.parse(row.subject_areas || '[]'),
+    })) as unknown as Job[]
 
     const latency = Math.round(performance.now() - start)
     return { jobs, total, companyCount, latency }
@@ -598,6 +622,7 @@ app.get('/', async (c) => {
   const params = getSearchParams(c)
   const { jobs, total, companyCount, latency } = await getJobs(c.env.DB, params)
 
+  // @ts-ignore
   return c.render(
     <>
       <ThemeToggle />
@@ -614,7 +639,7 @@ app.get('/', async (c) => {
         <div class="main-content">
           <div class="jobs-grid">
             {jobs.length > 0 ? (
-              jobs.map((job) => <JobCard job={job} />)
+              jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN} />)
             ) : (
               <div class="no-results">No results found.</div>
             )}
@@ -623,7 +648,8 @@ app.get('/', async (c) => {
         <DetailPanel />
       </div>
       <div class="panel-overlay" id="panelOverlay"></div>
-    </>
+    </>,
+    { logoDevToken: c.env.LOGO_DEV_TOKEN }
   )
 })
 
@@ -637,7 +663,7 @@ app.get('/api/jobs', async (c) => {
 
   return c.html(
     <>
-      {jobs.map((job) => <JobCard job={job} />)}
+      {jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN} />)}
     </>
   )
 })

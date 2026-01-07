@@ -358,26 +358,71 @@ const initJobDetails = () => {
 
             if (elements.panelJobTitle) elements.panelJobTitle.textContent = job.title || 'Untitled'
             if (elements.panelCompanyName) elements.panelCompanyName.textContent = job.company || 'Unknown'
-            if (elements.panelCompanyIcon) elements.panelCompanyIcon.textContent = job.company ? job.company.charAt(0).toUpperCase() : '?'
-            if (elements.panelLocation) elements.panelLocation.textContent = job.location || 'Not specified'
+
+            if (elements.panelLocation) elements.panelLocation.textContent = job.location ? job.location.split(';').map(l => l.trim()).join(', ') : 'Not specified'
             if (elements.panelPosted) elements.panelPosted.textContent = formatDate(job.posted) || 'Unknown'
             if (elements.panelApplyBtn) elements.panelApplyBtn.href = job.url || '#'
 
+            const token = document.body.dataset.logoDevToken || ''
+
+            // Logo logic for panel using Logo.dev
+            const companyName = job.company || ''
+            let query = companyName
+            if (job.company_url) {
+                try {
+                    const urlStr = job.company_url.startsWith('http') ? job.company_url : `https://${job.company_url}`
+                    query = new URL(urlStr).hostname
+                } catch (e) {
+                    // stick with name
+                }
+            }
+
+            const logoUrl = token ? `https://img.logo.dev/${encodeURIComponent(query)}?token=${token}` : ''
+            const iconLetter = companyName ? companyName.charAt(0).toUpperCase() : '?'
+
+            if (elements.panelCompanyIcon) {
+                elements.panelCompanyIcon.innerHTML = ''
+                if (logoUrl) {
+                    const img = document.createElement('img')
+                    img.src = logoUrl
+                    img.alt = companyName
+                    img.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 6px;'
+                    img.onerror = () => {
+                        img.style.display = 'none'
+                        const span = document.createElement('span')
+                        span.textContent = iconLetter
+                        span.style.cssText = 'display: flex; width: 100%; height: 100%; align-items: center; justify-content: center;'
+                        elements.panelCompanyIcon!.appendChild(span)
+                    }
+                    elements.panelCompanyIcon.appendChild(img)
+                } else {
+                    elements.panelCompanyIcon.textContent = iconLetter
+                }
+            }
+
             if (elements.panelDegree) {
-                if (job.degree_level) {
+                const degrees = (job.degree_levels && job.degree_levels.length > 0)
+                    ? job.degree_levels.join(', ')
+                    : job.degree_level;
+
+                if (degrees) {
                     elements.panelDegree.style.display = 'flex'
                     const span = elements.panelDegree.querySelector('span')
-                    if (span) span.textContent = job.degree_level
+                    if (span) span.textContent = degrees
                 } else {
                     elements.panelDegree.style.display = 'none'
                 }
             }
 
             if (elements.panelField) {
-                if (job.subject_area) {
+                const fields = (job.subject_areas && job.subject_areas.length > 0)
+                    ? job.subject_areas.join(', ')
+                    : job.subject_area;
+
+                if (fields) {
                     elements.panelField.style.display = 'flex'
                     const span = elements.panelField.querySelector('span')
-                    if (span) span.textContent = job.subject_area
+                    if (span) span.textContent = fields
                 } else {
                     elements.panelField.style.display = 'none'
                 }

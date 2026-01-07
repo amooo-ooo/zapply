@@ -55,7 +55,7 @@ trait JobDb: Send + Sync {
         let mut queries = Vec::new();
         for job in jobs {
             queries.push(DbQuery {
-                sql: "INSERT OR IGNORE INTO jobs (id, title, description, company, slug, ats, url, location, posted) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)".to_string(),
+                sql: "INSERT OR IGNORE INTO jobs (id, title, description, company, slug, ats, url, company_url, location, posted) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)".to_string(),
                 params: vec![
                     Value::String(job.id.clone()),
                     Value::String(job.title.clone()),
@@ -64,6 +64,7 @@ trait JobDb: Send + Sync {
                     Value::String(job.slug.clone()),
                     Value::String(serde_json::to_string(&job.ats)?),
                     Value::String(job.url.clone()),
+                    job.company_url.as_ref().map(|s| Value::String(s.clone())).unwrap_or(Value::Null),
                     Value::String(job.location.clone()),
                     Value::String(job.posted.clone()),
                 ],
@@ -318,6 +319,12 @@ impl Scraper {
         let filtered: Vec<Job> = jobs.into_iter()
             .filter(|j| regex.is_match(&j.title))
             .map(|mut j| {
+                // Populate company domain
+                j.company_url = company.domain.clone();
+
+                // Populate company domain
+                j.company_url = company.domain.clone();
+
                 // Detect tags
                 let mut unique_tags = HashSet::new();
                 unique_tags.extend(j.tags);

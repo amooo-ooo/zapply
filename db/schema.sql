@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     slug TEXT NOT NULL,
     ats TEXT NOT NULL,
     url TEXT NOT NULL,
+    company_url TEXT,
     location TEXT,
     posted TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

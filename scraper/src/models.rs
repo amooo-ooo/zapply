@@ -55,6 +55,7 @@ pub struct CompanyEntry {
     pub ats_type: AtsType,
     pub slug: String,
     pub api_url: String,
+    pub domain: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -67,6 +68,7 @@ pub struct Job {
     pub slug: String,
     pub ats: AtsType,
     pub url: String,
+    pub company_url: Option<String>,
     pub location: String,
     pub posted: String,
     pub departments: Vec<String>,
