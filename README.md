@@ -3,7 +3,7 @@
 zapply is an internship and early career search engine for students facing the competitive job market. zapply aggregates opportunities and tags relevant roles directly from company ATS systems and other job boards.
 
 <p align="center">
-  <img src="docs/assets/screenshot.png" alt="zapply Screenshot" width="700">
+  <img src="public/og-image.png" alt="zapply Screenshot" width="700">
 </p>
 
 > [!NOTE]
