@@ -174,7 +174,7 @@ impl AtsType {
 
         items.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id, j.text, j.hosted_url);
-            job.description = clean_html(&j.description_plain.or(j.description).unwrap_or_default());
+            job.description = clean_html(&j.description.unwrap_or_default());
             job.location = j.categories.location.unwrap_or_default();
             job.posted = normalize_date(&j.created_at.map(|c| c.to_string()).unwrap_or_default());
             
@@ -216,7 +216,7 @@ impl AtsType {
             job.location = j.location.unwrap_or_default();
             job.posted = normalize_date(&j.published_at.unwrap_or_default());
             
-            job.description = j.description_plain.as_ref()
+            job.description = j.description_html.as_ref()
                 .or(j.description_html.as_ref())
                 .map(|d| clean_html(d.as_str()))
                 .unwrap_or_default();

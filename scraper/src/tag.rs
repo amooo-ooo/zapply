@@ -72,6 +72,9 @@ impl TagEngine {
         simple!(r"(?i)\bkotlin\b", "Kotlin");
         simple!(r"(?i)\bscala\b", "Scala");
         simple!(r"(?i)\belixir\b", "Elixir");
+        simple!(r"(?i)\bhaskell\b", "Haskell");
+        simple!(r"(?i)\berlang\b", "Erlang");
+        simple!(r"(?i)\bclojure\b", "Clojure");
         
         // Frameworks & Libraries
         simple!(r"(?i)\breact\b", "React");
@@ -183,6 +186,14 @@ impl TagEngine {
         simple!(r"(?i)\bbioinformatics\b", "Bioinformatics");
         simple!(r"(?i)\bclinical trials\b", "Clinical Trials");
         simple!(r"(?i)\bpharmacovigilance\b", "Pharmacovigilance");
+        
+        // HealthTech specifics
+        simple!(r"(?i)\bathenahealth\b", "Athenahealth");
+        simple!(r"(?i)\ballscripts\b", "Allscripts");
+        simple!(r"(?i)\bmeditech\b", "Meditech");
+        simple!(r"(?i)\beclinicalworks\b", "eClinicalWorks");
+        simple!(r"(?i)\bcarecloud\b", "CareCloud");
+        simple!(r"(?i)\bnextgen\b", "NextGen Health");
 
         // Business Technologies & SaaS
         simple!(r"(?i)\bsap\b", "SAP");
@@ -206,6 +217,17 @@ impl TagEngine {
         simple!(r"(?i)\basana\b", "Asana");
         simple!(r"(?i)\bmonday\.com\b", "Monday.com");
         simple!(r"(?i)\bnotion\b", "Notion");
+        simple!(r"(?i)\berp\b", "ERP");
+        simple!(r"(?i)\bgoogle (suite|workspace|docs|sheets|slides)\b", "Google Workspace");
+        simple!(r"(?i)\bmicrosoft (office|excel|word|powerpoint)\b|\bexcel\b|\bpowerpoint\b", "Microsoft Office");
+
+        // Creative & UI/UX specifics
+        simple!(r"(?i)\badobe xd\b", "Adobe XD");
+        simple!(r"(?i)\bframer\b", "Framer");
+        simple!(r"(?i)\bprinciple\b", "Principle");
+        simple!(r"(?i)\bzeplin\b", "Zeplin");
+        simple!(r"(?i)\binvision\b", "InVision");
+        simple!(r"(?i)\bcoreldraw\b", "CorelDraw");
 
         // Design & Creative
         simple!(r"(?i)\badobe (creative cloud|suite)\b", "Adobe CC");
@@ -237,6 +259,14 @@ impl TagEngine {
         simple!(r"(?i)\bscada\b", "SCADA");
         simple!(r"(?i)\bansys\b", "ANSYS");
 
+        // Engineering/Industrial specifics
+        simple!(r"(?i)\bsolid edge\b", "Solid Edge");
+        simple!(r"(?i)\bsiemens nx\b", "Siemens NX");
+        simple!(r"(?i)\baltium\b", "Altium Designer");
+        simple!(r"(?i)\borcad\b", "OrCAD");
+        simple!(r"(?i)\bkicad\b", "KiCad");
+        simple!(r"(?i)\brevit\b", "Revit");
+
         // Finance & Data
         simple!(r"(?i)\bbloomberg\b", "Bloomberg Terminal");
         simple!(r"(?i)\bfactset\b", "FactSet");
@@ -244,6 +274,15 @@ impl TagEngine {
         simple!(r"(?i)\bmorningstar\b", "Morningstar");
         strict_dist!(r"(?i)\bstata\b", "STATA", r"(?i)\b(statistical|data|analysis|research|quantitative|survey|econometrics)\b", 15);
         strict_dist!(r"(?i)\bsas\b", "SAS", r"(?i)\b(statistical|programming|data|analytics|business|intelligence|software)\b", 15);
+
+        // FinTech specifics
+        simple!(r"(?i)\breuters eikon\b", "Reuters Eikon");
+        simple!(r"(?i)\bquickbooks\b", "QuickBooks");
+        simple!(r"(?i)\bxero\b", "Xero");
+        simple!(r"(?i)\bsage (intacct|50|100|200|300|erp)\b", "Sage");
+        simple!(r"(?i)\bintacct\b", "Intacct");
+        simple!(r"(?i)\bstripe\b", "Stripe");
+
         simple!(r"(?i)\bblockchain\b", "Blockchain");
         simple!(r"(?i)\bsolidity\b", "Solidity");
         simple!(r"(?i)\bsmart contracts\b", "Smart Contracts");
@@ -309,6 +348,29 @@ impl TagEngine {
         simple!(r"(?i)\bintellectual property\b|\bip\b", "Intellectual Property");
         simple!(r"(?i)\bparalegal\b", "Paralegal");
         simple!(r"(?i)\battorney\b", "Attorney");
+        
+        // LegalTech specifics
+        simple!(r"(?i)\blexisnexis\b|\blexis nexis\b", "LexisNexis");
+        simple!(r"(?i)\bwestlaw\b", "Westlaw");
+        simple!(r"(?i)\brelativity\b", "Relativity");
+        simple!(r"(?i)\bclio\b", "Clio");
+        simple!(r"(?i)\beverlaw\b", "Everlaw");
+        simple!(r"(?i)\bimanage\b", "iManage");
+
+        // Security & Cybersecurity specifics
+        simple!(r"(?i)\bburp suite\b", "Burp Suite");
+        simple!(r"(?i)\bmetasploit\b", "Metasploit");
+        simple!(r"(?i)\bwireshark\b", "Wireshark");
+        simple!(r"(?i)\bsplunk\b", "Splunk");
+        simple!(r"(?i)\bnessus\b", "Nessus");
+        simple!(r"(?i)\bokta\b", "Okta");
+
+        // HR & Recruiter Tech specifics
+        simple!(r"(?i)\bgreenhouse\b", "Greenhouse");
+        simple!(r"(?i)\blever\b", "Lever");
+        simple!(r"(?i)\bashby\b", "Ashby");
+        simple!(r"(?i)\bbamboohr\b", "BambooHR");
+        simple!(r"(?i)\brippling\b", "Rippling");
 
         // === Hardware & Science ===
         simple!(r"(?i)\belectrical engineering\b", "Electrical Engineering");
@@ -452,6 +514,7 @@ impl EducationDetector {
         degree!(r"\b(master'?s?|m\.?s\.?|m\.?a\.?|msc|ma|mba)\b", "Master's");
         degree!(r"\b(ph\.?d\.?|doctorate|doctoral)\b", "PhD");
         degree!(r"\b(associate'?s?|a\.?s\.?|a\.?a\.?)\b", "Associate's");
+        degree!(r"\b(md|jd|llb|llm|dds|dvm)\b", "Professional Degree");
 
         // Subject areas
         subject!(r"\b(computer science|cs)\b", "Computer Science");
@@ -505,13 +568,19 @@ impl EducationDetector {
         subject!(r"\b(linguistics)\b", "Linguistics");
         subject!(r"\b(arts?|fine arts|visual arts|art history)\b", "Arts");
         subject!(r"\b(music|musicology)\b", "Music");
-
-        // Professional & Other
+        
+        // Professional & Other (Restored)
         subject!(r"\b(architecture)\b", "Architecture");
         subject!(r"\b(law|legal studies|jurisprudence)\b", "Law");
         subject!(r"\b(education|teaching|pedagogy)\b", "Education");
-        subject!(r"\b(nursing|healthcare administration|public health)\b", "Healthcare");
+        subject!(r"\b(nursing)\b", "Nursing");
+        subject!(r"\b(healthcare administration|public health)\b", "Healthcare");
+        subject!(r"\b(medicine|medical studies)\b", "Medicine");
+        subject!(r"\b(pharmacy|pharmaceutical sciences)\b", "Pharmacy");
+        subject!(r"\b(dentistry|dental medicine)\b", "Dentistry");
+        subject!(r"\b(veterinary medicine|vet science)\b", "Veterinary Medicine");
         subject!(r"\b(social work)\b", "Social Work");
+
 
         let regex_set = regex::RegexSetBuilder::new(patterns)
             .case_insensitive(true)
@@ -823,6 +892,82 @@ mod tests {
         assert!(tags_set.contains("Confluence"));
         assert!(tags_set.contains("SAP"));
         assert!(tags_set.contains("Oracle ERP"));
+    }
+
+    #[test]
+    fn test_new_languages() {
+        let engine = TagEngine::new();
+        assert!(engine.detect_tags("Expert in Haskell and Erlang").contains(&"Haskell"));
+        assert!(engine.detect_tags("Lisp or Clojure experience").contains(&"Clojure"));
+    }
+
+    #[test]
+    fn test_business_tools() {
+        let engine = TagEngine::new();
+        assert!(engine.detect_tags("Using Google Workspace and MS Excel").contains(&"Google Workspace"));
+        assert!(engine.detect_tags("Microsoft Word and Powerpoint proficiency").contains(&"Microsoft Office"));
+        assert!(engine.detect_tags("Managing ERP systems").contains(&"ERP"));
+    }
+
+    #[test]
+    fn test_specialized_field_tools() {
+        let engine = TagEngine::new();
+        
+        // LegalTech
+        let legal = engine.detect_tags("Familiar with LexisNexis, Westlaw, and Relativity");
+        assert!(legal.contains(&"LexisNexis"));
+        assert!(legal.contains(&"Westlaw"));
+        assert!(legal.contains(&"Relativity"));
+
+        // HealthTech
+        let health = engine.detect_tags("Experience with Athenahealth or Meditech");
+        assert!(health.contains(&"Athenahealth"));
+        assert!(health.contains(&"Meditech"));
+
+        // FinTech
+        let finance = engine.detect_tags("Proficiency in QuickBooks and Xero");
+        assert!(finance.contains(&"QuickBooks"));
+        assert!(finance.contains(&"Xero"));
+
+        // Engineering
+        let eng = engine.detect_tags("Skills in Altium, Revit, and AutoCAD");
+        assert!(eng.contains(&"Altium Designer"));
+        assert!(eng.contains(&"Revit"));
+        assert!(eng.contains(&"AutoCAD"));
+    }
+
+    #[test]
+    fn test_new_education_subjects() {
+        let detector = EducationDetector::new();
+        
+        let med = detector.detect("Student studying Medicine");
+        assert!(med.subject_areas.contains(&"Medicine".to_string()));
+
+        let pharm = detector.detect("Pursuing a degree in Pharmaceutical Sciences");
+        assert!(pharm.subject_areas.contains(&"Pharmacy".to_string()));
+
+        let dent = detector.detect("Enrolled in Dentistry school");
+        assert!(dent.subject_areas.contains(&"Dentistry".to_string()));
+
+        let vet = detector.detect("Currently in Vet Science program");
+        assert!(vet.subject_areas.contains(&"Veterinary Medicine".to_string()));
+
+        let nursing = detector.detect("Nursing student graduating soon");
+        assert!(nursing.subject_areas.contains(&"Nursing".to_string()));
+    }
+
+    #[test]
+    fn test_professional_degrees() {
+        let detector = EducationDetector::new();
+        
+        let jd = detector.detect("JD candidate 2026");
+        assert!(jd.degree_levels.contains(&"Professional Degree".to_string()));
+
+        let md = detector.detect("MD student in clinical rotations");
+        assert!(md.degree_levels.contains(&"Professional Degree".to_string()));
+
+        let llm = detector.detect("Pursuing an LLM degree");
+        assert!(llm.degree_levels.contains(&"Professional Degree".to_string()));
     }
 
     #[test]
