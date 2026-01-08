@@ -351,6 +351,14 @@ const initJobDetails = () => {
         elements.detailPanel.classList.add('open')
 
         try {
+            // Update URL if this is a new selection (not from popstate or initial load)
+            const urlParams = new URLSearchParams(window.location.search)
+            if (urlParams.get('job') !== jobId) {
+                urlParams.set('job', jobId)
+                const newUrl = `${window.location.pathname}?${urlParams.toString()}`
+                window.history.pushState({ job: jobId }, '', newUrl)
+            }
+
             const res = await fetch(`/api/job/${jobId}`)
             if (!res.ok) throw new Error('Failed to fetch job')
 
@@ -408,7 +416,7 @@ const initJobDetails = () => {
             if (elements.panelDegree) {
                 const degrees = (job.degree_levels && job.degree_levels.length > 0)
                     ? job.degree_levels.join(', ')
-                    : job.degree_level;
+                    : '';
 
                 if (degrees) {
                     elements.panelDegree.style.display = 'flex'
@@ -422,7 +430,7 @@ const initJobDetails = () => {
             if (elements.panelField) {
                 const fields = (job.subject_areas && job.subject_areas.length > 0)
                     ? job.subject_areas.join(', ')
-                    : job.subject_area;
+                    : '';
 
                 if (fields) {
                     elements.panelField.style.display = 'flex'
@@ -483,7 +491,7 @@ const initJobDetails = () => {
         }
     }
 
-    const closeJobDetails = () => {
+    const closeJobDetails = (shouldUpdateUrl = true) => {
         if (!elements.detailPanel) return
 
         elements.detailPanel.classList.remove('open')
@@ -494,10 +502,20 @@ const initJobDetails = () => {
             state.currentActiveCard.classList.remove('active')
             state.currentActiveCard = null
         }
+
+        if (shouldUpdateUrl) {
+            const urlParams = new URLSearchParams(window.location.search)
+            if (urlParams.has('job')) {
+                urlParams.delete('job')
+                const queryString = urlParams.toString()
+                const newUrl = `${window.location.pathname}${queryString ? '?' + queryString : ''}`
+                window.history.pushState({}, '', newUrl)
+            }
+        }
     }
 
-    elements.closePanel?.addEventListener('click', closeJobDetails)
-    elements.panelOverlay?.addEventListener('click', closeJobDetails)
+    elements.closePanel?.addEventListener('click', () => closeJobDetails())
+    elements.panelOverlay?.addEventListener('click', () => closeJobDetails())
 
     const attachListeners = (container: Element) => {
         const jobCards = container.querySelectorAll('.job-card[data-job-id]')
@@ -518,8 +536,36 @@ const initJobDetails = () => {
         attachListeners(elements.mainContent)
     }
 
-    // Export to global for infinite scroll
-    ; (window as any).attachJobCardListeners = attachListeners
+    // Handle initial job from URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const initialJobId = urlParams.get('job')
+    if (initialJobId) {
+        // Try to find the card in the initial list
+        const card = document.querySelector(`.job-card[data-job-id="${initialJobId}"]`)
+        if (card) {
+            showJobDetails(initialJobId, card as HTMLElement)
+        } else {
+            // If card not in initial batch, just show details (card won't be highlighted)
+            // The card might load later via infinite scroll, but we show details anyway
+            const dummyCard = document.createElement('div')
+            showJobDetails(initialJobId, dummyCard)
+        }
+    }
+
+    // Handle back/forward navigation
+    window.addEventListener('popstate', (e) => {
+        const urlParams = new URLSearchParams(window.location.search)
+        const jobId = urlParams.get('job')
+        if (jobId) {
+            const card = document.querySelector(`.job-card[data-job-id="${jobId}"]`)
+            showJobDetails(jobId, (card || document.createElement('div')) as HTMLElement)
+        } else {
+            closeJobDetails(false)
+        }
+    })
+
+        // Export to global for infinite scroll
+        ; (window as any).attachJobCardListeners = attachListeners
 }
 
 const initInfiniteScroll = () => {
