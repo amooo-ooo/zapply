@@ -3,6 +3,9 @@
   "name": "zapply",
   "compatibility_date": "2025-08-03",
   "main": "./src/index.tsx",
+  "vars": {
+    "LOGO_DEV_TOKEN": "pk_WpkbAqPkS3CuTS3u77rAiw"
+  },
   "d1_databases": [
     {
       "binding": "DB",

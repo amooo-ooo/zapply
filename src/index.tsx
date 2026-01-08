@@ -648,7 +648,7 @@ app.get('/', async (c) => {
         <div class="main-content">
           <div class="jobs-grid">
             {jobs.length > 0 ? (
-              jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN} />)
+              jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN || ''} />)
             ) : (
               <div class="no-results">No results found.</div>
             )}
@@ -658,7 +658,7 @@ app.get('/', async (c) => {
       </div>
       <div class="panel-overlay" id="panelOverlay"></div>
     </>,
-    { logoDevToken: c.env.LOGO_DEV_TOKEN }
+    { logoDevToken: c.env.LOGO_DEV_TOKEN || '' }
   )
 })
 
@@ -672,7 +672,7 @@ app.get('/api/jobs', async (c) => {
 
   return c.html(
     <>
-      {jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN} />)}
+      {jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN || ''} />)}
     </>
   )
 })
