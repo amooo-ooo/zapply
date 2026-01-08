@@ -217,7 +217,6 @@ impl AtsType {
             job.posted = normalize_date(&j.published_at.unwrap_or_default());
             
             job.description = j.description_html.as_ref()
-                .or(j.description_html.as_ref())
                 .map(|d| clean_html(d.as_str()))
                 .unwrap_or_default();
 

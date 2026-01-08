@@ -15,16 +15,6 @@ impl Default for WorkMode {
     }
 }
 
-impl WorkMode {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Remote => "remote",
-            Self::Hybrid => "hybrid",
-            Self::InOffice => "inoffice",
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AtsType {
@@ -160,8 +150,6 @@ pub struct LeverJob {
     pub id: String,
     pub text: String,
     pub hosted_url: String,
-    #[serde(rename = "descriptionPlain")]
-    pub description_plain: Option<String>,
     pub description: Option<String>,
     pub categories: LeverCategories,
     #[serde(rename = "createdAt")]
@@ -216,7 +204,6 @@ pub struct AshbyJob {
     pub location: Option<String>,
     pub published_at: Option<String>,
     pub department: Option<String>,
-    pub description_plain: Option<AtsDescription>,
     pub description_html: Option<AtsDescription>,
 }
 

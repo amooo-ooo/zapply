@@ -180,6 +180,8 @@ impl TagEngine {
         simple!(r"(?i)\bfhir\b", "FHIR");
         simple!(r"(?i)\bdicom\b", "DICOM");
         simple!(r"(?i)\bpacs\b", "PACS");
+        simple!(r"(?i)\bpointclickcare\b", "PointClickCare");
+        simple!(r"(?i)\bpractice fusion\b", "Practice Fusion");
         strict_dist!(r"(?i)\bhipaa\b", "HIPAA Compliance", r"(?i)\b(compliance|security|privacy|regulation|standards|training)\b", 15);
         simple!(r"(?i)\bmedtech\b", "MedTech");
         simple!(r"(?i)\bbiotech\b", "Biotech");
@@ -262,6 +264,10 @@ impl TagEngine {
         // Engineering/Industrial specifics
         simple!(r"(?i)\bsolid edge\b", "Solid Edge");
         simple!(r"(?i)\bsiemens nx\b", "Siemens NX");
+        simple!(r"(?i)\bcatia\b", "CATIA");
+        simple!(r"(?i)\bfusion 360\b", "Fusion 360");
+        simple!(r"(?i)\bteamcenter\b", "Teamcenter");
+        simple!(r"(?i)\bmastercam\b", "Mastercam");
         simple!(r"(?i)\baltium\b", "Altium Designer");
         simple!(r"(?i)\borcad\b", "OrCAD");
         simple!(r"(?i)\bkicad\b", "KiCad");
@@ -282,6 +288,9 @@ impl TagEngine {
         simple!(r"(?i)\bsage (intacct|50|100|200|300|erp)\b", "Sage");
         simple!(r"(?i)\bintacct\b", "Intacct");
         simple!(r"(?i)\bstripe\b", "Stripe");
+        simple!(r"(?i)\badyen\b", "Adyen");
+        simple!(r"(?i)\bplaid\b", "Plaid");
+        simple!(r"(?i)\bsquare\b", "Square");
 
         simple!(r"(?i)\bblockchain\b", "Blockchain");
         simple!(r"(?i)\bsolidity\b", "Solidity");
@@ -356,6 +365,9 @@ impl TagEngine {
         simple!(r"(?i)\bclio\b", "Clio");
         simple!(r"(?i)\beverlaw\b", "Everlaw");
         simple!(r"(?i)\bimanage\b", "iManage");
+        simple!(r"(?i)\bnetdocuments\b", "NetDocuments");
+        simple!(r"(?i)\bironclad\b", "Ironclad");
+        simple!(r"(?i)\bbloomberg law\b", "Bloomberg Law");
 
         // Security & Cybersecurity specifics
         simple!(r"(?i)\bburp suite\b", "Burp Suite");
@@ -364,6 +376,8 @@ impl TagEngine {
         simple!(r"(?i)\bsplunk\b", "Splunk");
         simple!(r"(?i)\bnessus\b", "Nessus");
         simple!(r"(?i)\bokta\b", "Okta");
+        simple!(r"(?i)\bcrowdstrike\b", "CrowdStrike");
+        simple!(r"(?i)\bsentinelone\b", "SentinelOne");
 
         // HR & Recruiter Tech specifics
         simple!(r"(?i)\bgreenhouse\b", "Greenhouse");
