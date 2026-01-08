@@ -1,22 +1,25 @@
 mod models;
 mod parsers;
 mod tag;
+mod location; 
 
 use anyhow::{Context, Result};
 use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::fs;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::io::Write;
 use indicatif::{ProgressBar, ProgressStyle};
+use chrono::{DateTime, Duration, Utc};
 
 use crate::models::{Job, CompanyEntry, AtsType};
 use crate::parsers::AtsParser;
 use crate::tag::{TagEngine, EducationDetector};
+use crate::location::LocationEngine;
 
 // --- Configuration & Types ---
 
@@ -48,14 +51,14 @@ pub struct DbQuery {
 trait JobDb: Send + Sync {
     async fn execute_batch(&self, queries: &[DbQuery]) -> Result<()>;
     async fn get_existing_ids(&self) -> Result<HashSet<String>>;
-
+    async fn initialize_geo_tables(&self, countries: &HashMap<String, String>, regions: &HashMap<String, String>) -> Result<()>;
     async fn insert_jobs(&self, jobs: &[Job]) -> Result<()> {
         if jobs.is_empty() { return Ok(()); }
         
         let mut queries = Vec::new();
         for job in jobs {
             queries.push(DbQuery {
-                sql: "INSERT OR IGNORE INTO jobs (id, title, description, company, slug, ats, url, company_url, location, posted) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)".to_string(),
+                sql: "INSERT OR IGNORE INTO jobs (id, title, description, company, slug, ats, url, company_url, location, city, region, country, country_code, posted) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)".to_string(),
                 params: vec![
                     Value::String(job.id.clone()),
                     Value::String(job.title.clone()),
@@ -66,6 +69,10 @@ trait JobDb: Send + Sync {
                     Value::String(job.url.clone()),
                     job.company_url.as_ref().map(|s| Value::String(s.clone())).unwrap_or(Value::Null),
                     Value::String(job.location.clone()),
+                    job.city.as_ref().map(|s| Value::String(s.clone())).unwrap_or(Value::Null),
+                    job.region.as_ref().map(|s| Value::String(s.clone())).unwrap_or(Value::Null),
+                    job.country.as_ref().map(|s| Value::String(s.clone())).unwrap_or(Value::Null),
+                    job.country_code.as_ref().map(|s| Value::String(s.clone())).unwrap_or(Value::Null),
                     Value::String(job.posted.clone()),
                 ],
             });
@@ -127,7 +134,7 @@ struct LocalWranglerD1 {
 #[async_trait::async_trait]
 impl JobDb for LocalWranglerD1 {
     async fn execute_batch(&self, queries: &[DbQuery]) -> Result<()> {
-        for chunk in queries.chunks(50) {
+        for chunk in queries.chunks(1000) {
             let mut sql = String::new();
             sql.push_str("BEGIN TRANSACTION;\n");
             for query in chunk {
@@ -183,6 +190,41 @@ impl JobDb for LocalWranglerD1 {
         }
         Ok(ids)
     }
+
+    async fn initialize_geo_tables(&self, countries: &HashMap<String, String>, regions: &HashMap<String, String>) -> Result<()> {
+        // Check if data already exists
+        let output = run_wrangler(vec![&self.database_name, "--local", "--command", "SELECT count(*) as count FROM countries", "--json"])?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let json_start = stdout.find('[').or(stdout.find('{')).unwrap_or(0);
+            if let Ok(data) = serde_json::from_str::<Value>(&stdout[json_start..]) {
+                if let Some(results) = data[0]["results"].as_array() {
+                    if let Some(count) = results.first().and_then(|r| r["count"].as_i64()) {
+                        if count > 0 {
+                            println!("[INFO] Geo tables already initialized ({} countries found). Skipping...", count);
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut queries = Vec::new();
+        for (code, name) in countries {
+            queries.push(DbQuery {
+                sql: "INSERT OR IGNORE INTO countries (code, name) VALUES (?1, ?2)".to_string(),
+                params: vec![Value::String(code.clone()), Value::String(name.clone())],
+            });
+        }
+        for (id, name) in regions {
+            let country_code = id.split('.').next().unwrap_or("").to_string();
+            queries.push(DbQuery {
+                sql: "INSERT OR IGNORE INTO regions (id, country_code, name) VALUES (?1, ?2, ?3)".to_string(),
+                params: vec![Value::String(id.clone()), Value::String(country_code), Value::String(name.clone())],
+            });
+        }
+        self.execute_batch(&queries).await
+    }
 }
 
 struct RemoteD1 {
@@ -195,7 +237,7 @@ struct RemoteD1 {
 #[async_trait::async_trait]
 impl JobDb for RemoteD1 {
     async fn execute_batch(&self, queries: &[DbQuery]) -> Result<()> {
-        for chunk in queries.chunks(10) {
+        for chunk in queries.chunks(50) {
             let url = format!("https://api.cloudflare.com/client/v4/accounts/{}/d1/database/{}/raw", self.account_id, self.database_id);
             
             // Combine all statements into a single SQL string with semicolons
@@ -261,6 +303,24 @@ impl JobDb for RemoteD1 {
         }
         Ok(ids)
     }
+
+    async fn initialize_geo_tables(&self, countries: &HashMap<String, String>, regions: &HashMap<String, String>) -> Result<()> {
+        let mut queries = Vec::new();
+        for (code, name) in countries {
+            queries.push(DbQuery {
+                sql: "INSERT OR IGNORE INTO countries (code, name) VALUES (?1, ?2)".to_string(),
+                params: vec![Value::String(code.clone()), Value::String(name.clone())],
+            });
+        }
+        for (id, name) in regions {
+            let country_code = id.split('.').next().unwrap_or("").to_string();
+            queries.push(DbQuery {
+                sql: "INSERT OR IGNORE INTO regions (id, country_code, name) VALUES (?1, ?2, ?3)".to_string(),
+                params: vec![Value::String(id.clone()), Value::String(country_code), Value::String(name.clone())],
+            });
+        }
+        self.execute_batch(&queries).await
+    }
 }
 
 // --- Utilities ---
@@ -289,10 +349,11 @@ struct Scraper {
     log_file: Option<Arc<Mutex<fs::File>>>,
     tag_engine: Arc<TagEngine>,
     edu_detector: Arc<EducationDetector>,
+    location_engine: Arc<LocationEngine>,
 }
 
 impl Scraper {
-    fn new(keyword_regex: Regex, cache: HashSet<String>, log_file: Option<fs::File>) -> Result<Self> {
+    fn new(keyword_regex: Regex, cache: HashSet<String>, log_file: Option<fs::File>, location_engine: LocationEngine) -> Result<Self> {
         let client = reqwest::Client::builder()
             .user_agent("Zapply/1.0")
             .timeout(std::time::Duration::from_secs(30))
@@ -300,10 +361,11 @@ impl Scraper {
         let log_file = log_file.map(|f| Arc::new(Mutex::new(f)));
         let tag_engine = Arc::new(TagEngine::new());
         let edu_detector = Arc::new(EducationDetector::new());
-        Ok(Self { client, keyword_regex, cache, log_file, tag_engine, edu_detector })
+        let location_engine = Arc::new(location_engine);
+        Ok(Self { client, keyword_regex, cache, log_file, tag_engine, edu_detector, location_engine })
     }
 
-    async fn process_company(client: &reqwest::Client, company: &CompanyEntry, regex: &Regex, tag_engine: &TagEngine, edu_detector: &EducationDetector) -> Result<Vec<Job>> {
+    async fn process_company(client: &reqwest::Client, company: &CompanyEntry, regex: &Regex, tag_engine: &TagEngine, edu_detector: &EducationDetector, location_engine: &LocationEngine) -> Result<Vec<Job>> {
         let mut url = company.api_url.clone();
         if company.ats_type == AtsType::Greenhouse && !url.contains("content=true") {
             url.push_str(if url.contains('?') { "&content=true" } else { "?content=true" });
@@ -311,13 +373,30 @@ impl Scraper {
         
         let resp = client.get(&url).send().await?;
         if !resp.status().is_success() {
-            return Err(anyhow::anyhow!("HTTP {}", resp.status()));
+            return Err(anyhow::anyhow!("HTTP {} for {}", resp.status(), url));
         }
         
-        let data: Value = resp.json().await?;
+        let data: Value = resp.json().await.map_err(|e| anyhow::anyhow!("JSON decode error for {}: {}", url, e))?;
         let jobs = company.ats_type.parse(company, &data);
+        
+        let now = Utc::now();
+        let cutoff_default = now - Duration::days(30);
+        let cutoff_eoi = now - Duration::days(90);
+
         let filtered: Vec<Job> = jobs.into_iter()
             .filter(|j| regex.is_match(&j.title))
+            .filter(|j| {
+                if j.posted.is_empty() { return true; }
+                
+                let title_lower = j.title.to_lowercase();
+                let is_eoi = title_lower.contains("expression of interest") || title_lower.contains("eoi");
+                let cutoff = if is_eoi { cutoff_eoi } else { cutoff_default };
+
+                if let Ok(parsed) = DateTime::parse_from_rfc3339(&j.posted) {
+                    return parsed.with_timezone(&Utc) > cutoff;
+                }
+                true
+            })
             .map(|mut j| {
                 // Populate company domain
                 j.company_url = company.domain.clone();
@@ -338,6 +417,28 @@ impl Scraper {
                 j.degree_levels = edu_info.degree_levels;
                 j.subject_areas = edu_info.subject_areas;
                 
+                // Normalize location
+                let loc_info = location_engine.resolve(&j.location);
+                let formatted = loc_info.display_format();
+                if !formatted.is_empty() {
+                    j.location = formatted;
+                }
+                j.city = loc_info.city;
+                j.region = loc_info.region;
+                j.country = loc_info.country;
+                j.country_code = loc_info.country_code;
+                
+                if loc_info.work_mode != crate::models::WorkMode::InOffice {
+                    let mode_str = match loc_info.work_mode {
+                        crate::models::WorkMode::Remote => "Remote",
+                        crate::models::WorkMode::Hybrid => "Hybrid",
+                        _ => "",
+                    };
+                    if !mode_str.is_empty() {
+                        j.tags.push(mode_str.to_string());
+                    }
+                }
+
                 j
             })
             .collect();
@@ -360,6 +461,7 @@ impl Scraper {
         let log_file = self.log_file.clone();
         let tag_engine = self.tag_engine.clone();
         let edu_detector = self.edu_detector.clone();
+        let location_engine = self.location_engine.clone();
 
         let results = stream::iter(companies)
             .map(|company| {
@@ -372,9 +474,10 @@ impl Scraper {
                 let pb = pb.clone();
                 let tag_engine = tag_engine.clone();
                 let edu_detector = edu_detector.clone();
+                let location_engine = location_engine.clone();
 
                 async move {
-                    let result = Self::process_company(&client, &company, &regex, &tag_engine, &edu_detector).await;
+                    let result = Self::process_company(&client, &company, &regex, &tag_engine, &edu_detector, &location_engine).await;
                     let jobs = match result {
                         Ok(j) => {
                             success_count.fetch_add(1, Ordering::SeqCst);
@@ -441,14 +544,16 @@ async fn main() -> Result<()> {
     };
 
     let keyword_regex = Regex::new(CONFIG.keywords_regex).context("Invalid Regex")?;
+    println!("[INFO] Loading company list...");
     let mut companies: Vec<CompanyEntry> = load_json(CONFIG.slugs_file)
         .context(format!("Failed to load {}", CONFIG.slugs_file))?;
 
     if let Some(limit) = args.iter().find_map(|a| a.strip_prefix("--limit=")).and_then(|s| s.parse().ok()) {
-        println!("[INFO] Limiting to first {} companies.", limit);
+        println!("[INFO] Limiting search to {} companies.", limit);
         companies.truncate(limit);
     }
 
+    println!("[INFO] Fetching existing job IDs from database...");
     let existing_ids = db.get_existing_ids().await?;
     let mut cache: HashSet<String> = load_json(CONFIG.cache_file).unwrap_or_default();
     cache.extend(existing_ids);
@@ -457,7 +562,15 @@ async fn main() -> Result<()> {
         .find_map(|a| a.strip_prefix("--log-file="))
         .and_then(|path| fs::File::create(path).ok());
 
-    let mut scraper = Scraper::new(keyword_regex, cache, log_file)?;
+    let mut location_engine = LocationEngine::new();
+    if let Err(e) = location_engine.load_geonames("cities15000.txt", "admin1CodesASCII.txt", "countryInfo.txt") {
+        println!("[WARN] Failed to load location data: {}. Location normalization will be limited.", e);
+    } else {
+        println!("[INFO] Initializing geo tables in database...");
+        db.initialize_geo_tables(&location_engine.countries, &location_engine.regions).await?;
+    }
+
+    let mut scraper = Scraper::new(keyword_regex, cache, log_file, location_engine)?;
     let new_jobs = scraper.run(companies).await;
 
     println!("[DONE] Found {} new early-career roles.", new_jobs.len());

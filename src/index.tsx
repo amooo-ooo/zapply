@@ -153,7 +153,15 @@ const JobCard = ({ job, token }: { job: Job; token: string }) => {
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
               </svg>
-              <span>{job.location.split(';').map((loc: string) => formatLocation(loc.trim())).filter(Boolean).join(', ')}</span>
+              <span style="display: flex; flex-direction: column;">
+                {job.city || job.region || job.country ? (
+                  [job.city, job.region, job.country].filter(Boolean).join(', ')
+                ) : (
+                  job.location.split(';').map((loc: string) => (
+                    <span key={loc}>{formatLocation(loc.trim())}</span>
+                  ))
+                )}
+              </span>
             </div>
           )}
 
@@ -243,10 +251,11 @@ const getJobs = async (
   if (params.location) {
     const locations = params.location.split(',').map(l => l.trim()).filter(Boolean)
     if (locations.length > 0) {
-      const conditions = locations.map(() => 'location LIKE ? ESCAPE "\\"').join(' OR ')
+      const conditions = locations.map(() => '(location LIKE ? ESCAPE "\\" OR city LIKE ? ESCAPE "\\" OR region LIKE ? ESCAPE "\\" OR country LIKE ? ESCAPE "\\" OR country_code LIKE ? ESCAPE "\\")').join(' OR ')
       whereClause += ` AND (${conditions})`
       locations.forEach(loc => {
-        sqlParams.push(`%${escapeLike(loc)}%`)
+        const escaped = `%${escapeLike(loc)}%`
+        sqlParams.push(escaped, escaped, escaped, escaped, escaped)
       })
     }
   }

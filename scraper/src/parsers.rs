@@ -83,6 +83,10 @@ impl AtsType {
             url,
             company_url: company.domain.clone(),
             location: String::new(),
+            city: None,
+            region: None,
+            country: None,
+            country_code: None,
             posted: String::new(),
             departments: vec![],
             offices: vec![],
@@ -95,7 +99,10 @@ impl AtsType {
     fn parse_greenhouse(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
         let raw_jobs = match self.get_raw_greenhouse_jobs(data) {
             Ok(jobs) => jobs,
-            Err(_) => return vec![],
+            Err(e) => {
+                println!("[ERROR] Greenhouse parsing failed for {}: {}", company.name, e);
+                return vec![];
+            }
         };
 
         raw_jobs.into_iter().map(|rj| {
@@ -197,7 +204,13 @@ impl AtsType {
     }
 
     fn parse_ashby(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
-        let resp: AshbyResponse = serde_json::from_value(data.clone()).unwrap_or(AshbyResponse { jobs: vec![] });
+        let resp: AshbyResponse = match serde_json::from_value(data.clone()) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("[ERROR] Ashby parsing failed for {}: {}", company.name, e);
+                return vec![];
+            }
+        };
         resp.jobs.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id, j.title, j.job_url);
             job.location = j.location.unwrap_or_default();

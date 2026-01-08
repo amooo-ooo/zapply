@@ -88,7 +88,7 @@
 .theme-menu.open .theme-pill {
   opacity: 1;
   visibility: visible;
-  --rotation: calc((var(--index) * -22deg) + 6deg);
+  --rotation: calc((var(--index) * -24deg) + 8deg);
   --radius: 34px;
   transform:
     translateY(-50%) rotate(var(--rotation)) translateX(calc(var(--radius) * -1)) scale(1);

@@ -1,4 +1,15 @@
--- Database schema for Zapply jobs
+CREATE TABLE IF NOT EXISTS countries (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS regions (
+    id TEXT PRIMARY KEY, -- e.g. "US.CA"
+    country_code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    FOREIGN KEY (country_code) REFERENCES countries(code) ON DELETE CASCADE
+);
+
 DROP TABLE IF EXISTS job_tags;
 DROP TABLE IF EXISTS job_offices;
 DROP TABLE IF EXISTS job_departments;
@@ -14,6 +25,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     url TEXT NOT NULL,
     company_url TEXT,
     location TEXT,
+    city TEXT,
+    region TEXT,
+    country TEXT,
+    country_code TEXT,
     posted TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,6 +72,15 @@ CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company);
 CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted);
 CREATE INDEX IF NOT EXISTS idx_jobs_title ON jobs(title);
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at_desc ON jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_city ON jobs(city);
+CREATE INDEX IF NOT EXISTS idx_jobs_region ON jobs(region);
+CREATE INDEX IF NOT EXISTS idx_jobs_country ON jobs(country);
+CREATE INDEX IF NOT EXISTS idx_jobs_country_code ON jobs(country_code);
+
+CREATE INDEX IF NOT EXISTS idx_countries_name ON countries(name);
+
+CREATE INDEX IF NOT EXISTS idx_regions_country_code ON regions(country_code);
+CREATE INDEX IF NOT EXISTS idx_regions_name ON regions(name);
 
 CREATE INDEX IF NOT EXISTS idx_job_departments_job_id ON job_departments(job_id);
 CREATE INDEX IF NOT EXISTS idx_job_departments_name ON job_departments(name);

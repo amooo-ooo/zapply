@@ -359,7 +359,12 @@ const initJobDetails = () => {
             if (elements.panelJobTitle) elements.panelJobTitle.textContent = job.title || 'Untitled'
             if (elements.panelCompanyName) elements.panelCompanyName.textContent = job.company || 'Unknown'
 
-            if (elements.panelLocation) elements.panelLocation.textContent = job.location ? job.location.split(';').map(l => l.trim()).join(', ') : 'Not specified'
+            if (elements.panelLocation) {
+                const locParts = [job.city, job.region, job.country].filter(Boolean)
+                elements.panelLocation.innerHTML = locParts.length > 0
+                    ? locParts.join(', ')
+                    : (job.location ? job.location.split(';').map(l => l.trim()).join('<br />') : 'Not specified')
+            }
             if (elements.panelPosted) elements.panelPosted.textContent = formatDate(job.posted) || 'Unknown'
             if (elements.panelApplyBtn) elements.panelApplyBtn.href = job.url || '#'
 

@@ -1,6 +1,30 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkMode {
+    Remote,
+    Hybrid,
+    InOffice,
+}
+
+impl Default for WorkMode {
+    fn default() -> Self {
+        Self::InOffice
+    }
+}
+
+impl WorkMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Remote => "remote",
+            Self::Hybrid => "hybrid",
+            Self::InOffice => "inoffice",
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AtsType {
@@ -70,6 +94,10 @@ pub struct Job {
     pub url: String,
     pub company_url: Option<String>,
     pub location: String,
+    pub city: Option<String>,
+    pub region: Option<String>,
+    pub country: Option<String>,
+    pub country_code: Option<String>,
     pub posted: String,
     pub departments: Vec<String>,
     pub offices: Vec<String>,

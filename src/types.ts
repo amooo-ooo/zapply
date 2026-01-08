@@ -4,6 +4,10 @@ export interface Job {
     description?: string
     company: string
     location: string
+    city?: string
+    region?: string
+    country?: string
+    country_code?: string
     url: string
     posted: string
     ats: string
@@ -12,7 +16,4 @@ export interface Job {
     departments?: string[]
     degree_levels?: string[]
     subject_areas?: string[]
-    // Backwards compatibility
-    degree_level?: string
-    subject_area?: string
 }

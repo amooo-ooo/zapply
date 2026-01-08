@@ -48,6 +48,14 @@ bun run db:setup
 bun run dev
 ```
 
+### Scraper Setup
+
+The scraper requires geonames data for accurate location normalisation and relational database population. Download the following files from [GeoNames](https://download.geonames.org/export/dump/) and place them in the `scraper/` directory:
+
+- [cities15000.zip](https://download.geonames.org/export/dump/cities15000.zip) (Unzip to get `cities15000.txt`)
+- [admin1CodesASCII.txt](https://download.geonames.org/export/dump/admin1CodesASCII.txt)
+- [countryInfo.txt](https://download.geonames.org/export/dump/countryInfo.txt)
+
 4. **Run Scraper**:
 ```bash
 bun run scrape:slugs
