@@ -150,7 +150,7 @@ export const JobCard = ({ job, token }: { job: Job; token: string }) => {
       </div>
 
       <div class="card-body">
-        <h3 class="job-title" id={`job-title-${job.id}`}>{job.title}</h3>
+        <h2 class="job-title" id={`job-title-${job.id}`}>{job.title}</h2>
 
         <div class="job-metadata">
           {job.location && (
@@ -615,7 +615,7 @@ const DetailPanel = () => (
           <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
         </svg>
       </div>
-      <h3>Select a role</h3>
+      <h2>Select a role</h2>
       <p>Click on a job card to view details</p>
     </div>
     <div class="panel-content" id="panelContent" style="display: none;">
@@ -684,7 +684,7 @@ app.get('/', async (c) => {
 
       <SearchFilters params={params} total={total} companyCount={companyCount} latency={latency} />
 
-      <div class="content-wrapper">
+      <main class="content-wrapper">
         <div class="main-content">
           <div class="jobs-grid">
             {jobs.length > 0 ? (
@@ -695,7 +695,7 @@ app.get('/', async (c) => {
           </div>
         </div>
         <DetailPanel />
-      </div>
+      </main>
       <div class="panel-overlay" id="panelOverlay"></div>
     </>,
     { logoDevToken: c.env.LOGO_DEV_TOKEN || '' }

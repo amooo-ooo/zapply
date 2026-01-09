@@ -10,7 +10,7 @@ declare module 'hono' {
 export const renderer = jsxRenderer(({ children, logoDevToken }: { children?: any, logoDevToken?: string }) => {
   // @ts-ignore - logoDevToken is passed from c.render
   return (
-    <html>
+    <html lang="en">
       <head>
         <ViteClient />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
