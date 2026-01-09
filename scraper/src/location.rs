@@ -4,6 +4,7 @@ use crate::models::WorkMode;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use anyhow::Result;
+use log::info;
 
 const REMOTE_KEYWORDS: &[&str] = &["remote", "anywhere", "wfh"];
 const HYBRID_KEYWORDS: &[&str] = &["hybrid"];
@@ -88,10 +89,10 @@ impl LocationEngine {
     }
 
     pub fn load_geonames(&mut self, cities_path: &str, admin_path: &str, country_path: &str) -> Result<()> {
-        println!("[INFO] Loading location data...");
+        info!("Loading location data...");
         
         // Load Country Info
-        println!("[INFO] Loading countries...");
+        info!("Loading countries...");
         let file = File::open(country_path)?;
         let reader = BufReader::new(file);
         for line in reader.lines() {
@@ -115,7 +116,7 @@ impl LocationEngine {
         self.country_lookup.insert("uk".to_string(), ("GB".to_string(), "United Kingdom".to_string()));
 
         // Load Admin1 Codes
-        println!("[INFO] Loading regions...");
+        info!("Loading regions...");
         let file = File::open(admin_path)?;
         let reader = BufReader::new(file);
         for line in reader.lines() {
@@ -147,7 +148,7 @@ impl LocationEngine {
         }
 
         // Load Cities
-        println!("[INFO] Loading cities (this may take a few seconds)...");
+        info!("Loading cities (this may take a few seconds)...");
         let file = File::open(cities_path)?;
         let reader = BufReader::new(file);
 
@@ -179,12 +180,12 @@ impl LocationEngine {
         }
 
         // Sort by population
-        println!("[INFO] Finalizing city data index...");
+        info!("Finalizing city data index...");
         for entries in self.cities.values_mut() {
             entries.sort_by(|a, b| b.population.cmp(&a.population));
         }
 
-        println!("[INFO] Location engine ready (loaded {} cities).", count);
+        info!("Location engine ready (loaded {} cities).", count);
         Ok(())
     }
 

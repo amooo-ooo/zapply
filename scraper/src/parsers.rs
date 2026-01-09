@@ -1,12 +1,15 @@
 use serde_json::Value;
 use crate::models::*;
 use chrono::{DateTime, Utc, TimeZone};
+use log::debug;
 use ammonia;
+use anyhow::{Result, Context};
 
 // --- Parsing Trait ---
 
 pub trait AtsParser {
-    fn parse(&self, company: &CompanyEntry, data: &Value) -> Vec<Job>;
+    fn parse(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>>;
+    fn estimate_raw_item_count(&self, data: &Value) -> usize;
 }
 
 fn normalize_date(date_str: &str) -> String {
@@ -37,7 +40,7 @@ fn normalize_date(date_str: &str) -> String {
     date_str.to_string()
 }
 
-fn clean_html(html: &str) -> String {
+pub(crate) fn clean_html(html: &str) -> String {
     if html.is_empty() { return String::new(); }
     
     // Decode common entities if it looks double-escaped
@@ -56,7 +59,7 @@ fn clean_html(html: &str) -> String {
 }
 
 impl AtsParser for AtsType {
-    fn parse(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
+    fn parse(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
         match self {
             AtsType::Greenhouse => self.parse_greenhouse(company, data),
             AtsType::Lever => self.parse_lever(company, data),
@@ -65,7 +68,15 @@ impl AtsParser for AtsType {
             AtsType::Workable => self.parse_workable(company, data),
             AtsType::Recruitee => self.parse_recruitee(company, data),
             AtsType::Breezy => self.parse_breezy(company, data),
-            _ => vec![],
+            _ => Ok(vec![]),
+        }
+    }
+
+    fn estimate_raw_item_count(&self, data: &Value) -> usize {
+        match self {
+            AtsType::Greenhouse => self.count_greenhouse(data),
+            AtsType::Ashby => self.count_ashby(data),
+            _ => 0,
         }
     }
 }
@@ -96,26 +107,42 @@ impl AtsType {
         }
     }
 
-    fn parse_greenhouse(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
+    fn count_greenhouse(&self, data: &Value) -> usize {
+        data["jobs"].as_array().map(|v| v.len())
+            .or_else(|| if data.is_array() { data.as_array().map(|v| v.len()) } else { None })
+            .unwrap_or(0)
+    }
+
+    fn count_ashby(&self, data: &Value) -> usize {
+        data["jobs"].as_array().map(|v| v.len()).unwrap_or(0)
+    }
+
+    fn parse_greenhouse(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
         let raw_jobs = match self.get_raw_greenhouse_jobs(data) {
             Ok(jobs) => jobs,
             Err(e) => {
-                println!("[ERROR] Greenhouse parsing failed for {}: {}", company.name, e);
-                return vec![];
+                let data_str = serde_json::to_string(data).unwrap_or_default();
+                debug!("Failed Greenhouse JSON (first 500 chars): {:.500}", data_str);
+                return Err(anyhow::anyhow!("Greenhouse parsing failed for {}: {}", company.name, e));
             }
         };
 
-        raw_jobs.into_iter().map(|rj| {
+        Ok(raw_jobs.into_iter().map(|rj| {
             let is_edu_optional = self.is_greenhouse_education_optional(&rj);
             let mut job = self.new_job(company, rj.id.to_string(), rj.title, rj.url);
             
             job.description = rj.description.as_ref().map(|d| clean_html(d.as_str())).unwrap_or_default();
             job.posted = normalize_date(rj.posted.as_deref().unwrap_or_default());
             
-            job.location = match rj.location {
-                Some(GreenhouseLocation::Object { name }) => name,
-                Some(GreenhouseLocation::String(s)) => s,
-                None => String::new(),
+            
+            job.location = match &rj.location {
+                Some(Value::String(s)) => s.clone(),
+                Some(Value::Object(map)) => {
+                    map.get("name").and_then(|v| v.as_str()).map(String::from)
+                        .or_else(|| map.get("city").and_then(|v| v.as_str()).map(String::from)) // Fallback to city
+                        .unwrap_or_else(|| "Unknown".to_string())
+                },
+                _ => String::new(),
             };
 
             if is_edu_optional {
@@ -126,12 +153,12 @@ impl AtsType {
             job.offices = rj.offices.into_iter().filter_map(|o| o.name).collect();
 
             job
-        }).collect()
+        }).collect())
     }
 
     fn get_raw_greenhouse_jobs(&self, data: &Value) -> Result<Vec<RawGreenhouseJob>, serde_json::Error> {
         if let Some(jobs) = data.get("jobs").and_then(|v| v.as_array()) {
-            serde_json::from_value::<Vec<RawGreenhouseJob>>(Value::Array(jobs.clone()))
+            serde_json::from_value::<Vec<RawGreenhouseJob>>(Value::Array(jobs.to_vec()))
         } else if let Ok(jobs) = serde_json::from_value::<Vec<RawGreenhouseJob>>(data.clone()) {
             Ok(jobs)
         } else {
@@ -140,39 +167,33 @@ impl AtsType {
     }
 
     fn is_greenhouse_education_optional(&self, rj: &RawGreenhouseJob) -> bool {
-        // Check top-level education field
-        if let Some(edu) = &rj.education {
-            let val = match edu {
-                GreenhouseEducation::Object { value } => value,
-                GreenhouseEducation::String(s) => s,
-            };
-            if val == "education_optional" { return true; }
-        }
+        const EDU_OPTIONAL: &str = "education_optional";
+        const EDU_FIELD: &str = "Education";
+        
+        let is_optional = |v: &str| v == EDU_OPTIONAL;
 
-        // Check metadata
-        if let Some(metadata) = &rj.metadata {
-            for item in metadata {
-                let name = item.name.as_ref().or(item.label.as_ref());
-                if name.map(|s| s.as_str()) == Some("Education") {
-                    let val_str = match &item.value {
-                        Value::String(s) => Some(s.as_str()),
-                        Value::Object(obj) => obj.get("value").and_then(|v| v.as_str()),
-                        _ => None,
-                    };
-                    if val_str == Some("education_optional") {
-                        return true;
-                    }
+        rj.education.as_ref().map_or(false, |e| match e {
+            GreenhouseEducation::Object { value } => is_optional(value),
+            GreenhouseEducation::String(s) => is_optional(s),
+        }) || rj.metadata.as_ref().map_or(false, |m| {
+            m.iter().any(|item| {
+                let name = item.name.as_deref().or(item.label.as_deref());
+                if name == Some(EDU_FIELD) {
+                    return item.value.as_str().map_or(false, is_optional) ||
+                           item.value.get("value").and_then(|v| v.as_str()).map_or(false, is_optional);
                 }
-            }
-        }
-
-        false
+                false
+            })
+        })
     }
 
-    fn parse_lever(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
-        let items: Vec<LeverJob> = serde_json::from_value(data.clone()).unwrap_or_default();
+    fn parse_lever(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
+        let items: Vec<LeverJob> = match serde_json::from_value(data.clone()) {
+            Ok(j) => j,
+            Err(e) => return Err(anyhow::anyhow!("Lever parsing failed for {}: {}", company.name, e)),
+        };
 
-        items.into_iter().map(|j| {
+        Ok(items.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id, j.text, j.hosted_url);
             job.description = clean_html(&j.description.unwrap_or_default());
             job.location = j.categories.location.unwrap_or_default();
@@ -186,34 +207,41 @@ impl AtsType {
             }
 
             job
-        }).collect()
+        }).collect())
     }
 
-    fn parse_smartrecruiters(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
-        let resp: SmartRecruitersResponse = serde_json::from_value(data.clone()).unwrap_or(SmartRecruitersResponse { content: vec![] });
-        resp.content.into_iter().map(|j| {
+    fn parse_smartrecruiters(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
+        let resp: SmartRecruitersResponse = serde_json::from_value(data.clone())
+            .context(format!("SmartRecruiters parsing failed for {}", company.name))?;
+        Ok(resp.content.into_iter().map(|j| {
             let url = format!("https://jobs.smartrecruiters.com/{}/{}", company.slug, j.id);
-            let mut job = self.new_job(company, j.uuid, j.name, url);
+            let mut job = self.new_job(company, j.id.clone(), j.name, url);
             job.location = format!("{}, {}", j.location.city.unwrap_or_default(), j.location.country.unwrap_or_default());
             job.posted = normalize_date(&j.released_date.unwrap_or_default());
             if let Some(dept) = j.department.and_then(|d| d.label) {
                 job.departments.push(dept);
             }
             job
-        }).collect()
+        }).collect())
     }
 
-    fn parse_ashby(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
+    fn parse_ashby(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
         let resp: AshbyResponse = match serde_json::from_value(data.clone()) {
             Ok(r) => r,
-            Err(e) => {
-                println!("[ERROR] Ashby parsing failed for {}: {}", company.name, e);
-                return vec![];
-            }
+            Err(e) => return Err(anyhow::anyhow!("Ashby parsing failed for {}: {}", company.name, e)),
         };
-        resp.jobs.into_iter().map(|j| {
+        Ok(resp.jobs.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id, j.title, j.job_url);
-            job.location = j.location.unwrap_or_default();
+            job.location = match &j.location {
+                 Some(Value::String(s)) => s.clone(),
+                 Some(Value::Object(map)) => {
+                    // Try common location fields
+                    map.get("name").and_then(|v| v.as_str()).map(String::from)
+                       .or_else(|| map.get("city").and_then(|v| v.as_str()).map(String::from))
+                       .unwrap_or_default()
+                 },
+                 _ => String::new(),
+            };
             job.posted = normalize_date(&j.published_at.unwrap_or_default());
             
             job.description = j.description_html.as_ref()
@@ -224,23 +252,42 @@ impl AtsType {
                 job.departments.push(dept);
             }
             job
-        }).collect()
+        }).collect())
     }
 
-    fn parse_workable(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
-        let resp: WorkableResponse = serde_json::from_value(data.clone()).unwrap_or(WorkableResponse { jobs: vec![] });
-        resp.jobs.into_iter().map(|j| {
+    fn parse_workable(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
+        let resp: WorkableResponse = serde_json::from_value(data.clone())
+            .context(format!("Workable parsing failed for {}", company.name))?;
+        Ok(resp.jobs.into_iter().map(|j| {
             let url = format!("https://apply.workable.com/{}/j/{}/", company.slug, j.shortcode);
-            let mut job = self.new_job(company, j.shortcode, j.title, url);
+            let mut job = self.new_job(company, j.shortcode.clone(), j.title, url);
             job.location = format!("{}, {}", j.city.unwrap_or_default(), j.country.unwrap_or_default());
             job.posted = normalize_date(&j.created_at.unwrap_or_default());
+            
+            // Build description from v2 API fields
+            let mut desc = j.description.unwrap_or_default();
+            if let Some(req) = j.requirements {
+                if !req.is_empty() {
+                    desc.push_str("<h3>Requirements</h3>");
+                    desc.push_str(&req);
+                }
+            }
+            if let Some(ben) = j.benefits {
+                if !ben.is_empty() {
+                    desc.push_str("<h3>Benefits</h3>");
+                    desc.push_str(&ben);
+                }
+            }
+            job.description = clean_html(&desc);
+            
             job
-        }).collect()
+        }).collect())
     }
 
-    fn parse_recruitee(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
-        let resp: RecruiteeResponse = serde_json::from_value(data.clone()).unwrap_or(RecruiteeResponse { offers: vec![] });
-        resp.offers.into_iter().map(|j| {
+    fn parse_recruitee(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
+        let resp: RecruiteeResponse = serde_json::from_value(data.clone())
+            .context(format!("Recruitee parsing failed for {}", company.name))?;
+        Ok(resp.offers.into_iter().map(|j| {
             let mut job = self.new_job(company, j.id.to_string(), j.title, j.careers_url);
             job.description = clean_html(&j.description.unwrap_or_default());
             job.location = j.location.unwrap_or_default();
@@ -249,12 +296,13 @@ impl AtsType {
                 job.departments.push(dept);
             }
             job
-        }).collect()
+        }).collect())
     }
 
-    fn parse_breezy(&self, company: &CompanyEntry, data: &Value) -> Vec<Job> {
-        let items: Vec<BreezyJob> = serde_json::from_value(data.clone()).unwrap_or_default();
-        items.into_iter().map(|j| {
+    fn parse_breezy(&self, company: &CompanyEntry, data: &Value) -> Result<Vec<Job>> {
+        let items: Vec<BreezyJob> = serde_json::from_value(data.clone())
+            .context(format!("Breezy parsing failed for {}", company.name))?;
+        Ok(items.into_iter().map(|j| {
             let url = format!("https://{}.breezy.hr/p/{}", company.slug, j.id);
             let mut job = self.new_job(company, j.id, j.name, url);
             job.description = clean_html(&j.description.unwrap_or_default());
@@ -264,6 +312,6 @@ impl AtsType {
                 job.departments.push(dept);
             }
             job
-        }).collect()
+        }).collect())
     }
 }

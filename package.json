@@ -9,6 +9,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "db:setup": "wrangler d1 execute zapply --file=db/schema.sql",
     "scrape": "cd scraper && cargo run --",
+    "scrape:prod": "cd scraper && cargo run --release --",
     "scrape:slugs": "bun scraper/index.ts"
   },
   "dependencies": {

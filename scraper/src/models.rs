@@ -18,12 +18,19 @@ impl Default for WorkMode {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AtsType {
+    #[serde(alias = "Greenhouse")]
     Greenhouse,
+    #[serde(alias = "Lever")]
     Lever,
+    #[serde(alias = "SmartRecruiters")]
     SmartRecruiters,
+    #[serde(alias = "Ashby")]
     Ashby,
+    #[serde(alias = "Workable")]
     Workable,
+    #[serde(alias = "Recruitee")]
     Recruitee,
+    #[serde(alias = "Breezy")]
     Breezy,
     #[serde(other)]
     Unknown,
@@ -106,7 +113,7 @@ pub struct RawGreenhouseJob {
     pub url: String,
     #[serde(alias = "content", alias = "description")]
     pub description: Option<AtsDescription>,
-    pub location: Option<GreenhouseLocation>,
+    pub location: Option<Value>, // Changed from Option<GreenhouseLocation>
     #[serde(alias = "updated_at")]
     pub posted: Option<String>,
     pub education: Option<GreenhouseEducation>,
@@ -117,12 +124,7 @@ pub struct RawGreenhouseJob {
     pub offices: Vec<RawGreenhouseNameItem>,
 }
 
-#[derive(Deserialize, Clone)]
-#[serde(untagged)]
-pub enum GreenhouseLocation {
-    Object { name: String },
-    String(String),
-}
+
 
 #[derive(Deserialize, Clone)]
 #[serde(untagged)]
@@ -172,7 +174,7 @@ pub struct SmartRecruitersResponse {
 #[derive(Deserialize)]
 pub struct SmartRecruitersJob {
     pub id: String,
-    pub uuid: String,
+    pub _uuid: String,
     pub name: String,
     pub released_date: Option<String>,
     pub location: SmartRecruitersLocation,
@@ -201,10 +203,35 @@ pub struct AshbyJob {
     pub id: String,
     pub title: String,
     pub job_url: String,
-    pub location: Option<String>,
+    pub location: Option<Value>, // Changed from Option<String>
     pub published_at: Option<String>,
     pub department: Option<String>,
     pub description_html: Option<AtsDescription>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartRecruitersDetail {
+    pub job_ad: SmartRecruitersJobAd,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartRecruitersJobAd {
+    pub sections: SmartRecruitersSections,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartRecruitersSections {
+    pub job_description: Option<SmartRecruitersSection>,
+    pub qualifications: Option<SmartRecruitersSection>,
+    pub additional_information: Option<SmartRecruitersSection>,
+}
+
+#[derive(Deserialize)]
+pub struct SmartRecruitersSection {
+    pub text: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -219,6 +246,16 @@ pub struct WorkableJob {
     pub city: Option<String>,
     pub country: Option<String>,
     pub created_at: Option<String>,
+    pub description: Option<String>,
+    pub requirements: Option<String>,
+    pub benefits: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct WorkableDetail {
+    pub description: Option<String>,
+    pub requirements: Option<String>,
+    pub benefits: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -238,6 +275,18 @@ pub struct RecruiteeJob {
 }
 
 #[derive(Deserialize)]
+pub struct RecruiteeDetailResponse {
+    pub offer: RecruiteeOfferDetail,
+}
+
+#[derive(Deserialize)]
+pub struct RecruiteeOfferDetail {
+    pub description: Option<String>,
+    pub requirements: Option<String>,
+    pub benefits: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct BreezyJob {
     #[serde(rename = "_id")]
     pub id: String,
@@ -252,3 +301,5 @@ pub struct BreezyJob {
 pub struct BreezyLocation {
     pub name: Option<String>,
 }
+
+
