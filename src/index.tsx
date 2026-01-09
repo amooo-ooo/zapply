@@ -101,7 +101,7 @@ export const JobCard = ({ job, token }: { job: Job; token: string }) => {
     }
   }
 
-  const logoUrl = `https://img.logo.dev/${encodeURIComponent(logoQuery)}?token=${token}`
+  const logoUrl = `https://img.logo.dev/${encodeURIComponent(logoQuery)}?token=${token}&size=64&format=webp`
 
   return (
     <article class="job-card" data-job-id={job.id} aria-labelledby={`job-title-${job.id}`} tabIndex={0}>

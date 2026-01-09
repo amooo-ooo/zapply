@@ -543,7 +543,7 @@ const initJobDetails = () => {
                 }
             }
 
-            const logoUrl = token ? `https://img.logo.dev/${encodeURIComponent(query)}?token=${token}` : ''
+            const logoUrl = query ? `https://img.logo.dev/${encodeURIComponent(query)}?token=${token}&size=128&format=webp` : null
             const iconLetter = companyName ? companyName.charAt(0).toUpperCase() : '?'
 
             if (elements.panelCompanyIcon) {
