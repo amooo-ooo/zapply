@@ -274,8 +274,8 @@ class TagInput {
             pill.setAttribute('style', getTagStyle(tag))
             pill.innerHTML = `
                 <span>${tag}</span>
-                <div class="tag-remove" data-index="${index}">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <div class="tag-remove" data-index="${index}" role="button" aria-label="Remove ${tag} tag">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -499,6 +499,9 @@ const initJobDetails = () => {
         state.currentActiveCard = cardElement
 
         elements.detailPanel.classList.add('open')
+        elements.detailPanel.setAttribute('aria-hidden', 'false')
+        // Set focus to the detail panel for screen readers
+        elements.detailPanel.focus()
 
         try {
             // Update URL if this is a new selection (not from popstate or initial load)
@@ -548,7 +551,10 @@ const initJobDetails = () => {
                 if (logoUrl) {
                     const img = document.createElement('img')
                     img.src = logoUrl
+                    img.width = 48
+                    img.height = 48
                     img.alt = companyName
+                    img.setAttribute('aria-hidden', 'false')
                     img.style.cssText = 'display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 6px;'
                     img.onerror = () => {
                         img.style.display = 'none'
@@ -645,10 +651,12 @@ const initJobDetails = () => {
         if (!elements.detailPanel) return
 
         elements.detailPanel.classList.remove('open')
+        elements.detailPanel.setAttribute('aria-hidden', 'true')
         elements.panelOverlay?.classList.remove('active')
         document.body.style.overflow = ''
 
         if (state.currentActiveCard) {
+            state.currentActiveCard.focus()
             state.currentActiveCard.classList.remove('active')
             state.currentActiveCard = null
         }
@@ -678,6 +686,14 @@ const initJobDetails = () => {
                 if ((e.target as HTMLElement).closest('.apply-btn')) return
                 const jobId = card.getAttribute('data-job-id')
                 if (jobId) showJobDetails(jobId, card as HTMLElement)
+            })
+
+            card.addEventListener('keydown', (e: any) => {
+                if (e.key === 'Enter') {
+                    if ((e.target as HTMLElement).closest('.apply-btn')) return
+                    const jobId = card.getAttribute('data-job-id')
+                    if (jobId) showJobDetails(jobId, card as HTMLElement)
+                }
             })
         })
     }

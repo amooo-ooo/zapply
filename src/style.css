@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+/* CSS Core & Variables */
 
 :root {
   color-scheme: light dark;
@@ -237,6 +236,7 @@ body {
   border-radius: 16px;
   padding: 1.5rem;
   z-index: 10;
+  outline: none;
 }
 
 /* Panel Default State */
@@ -675,24 +675,6 @@ header p {
   opacity: 0.9;
 }
 
-@media (max-width: 640px) {
-  .search-row {
-    flex-wrap: wrap;
-  }
-
-  .search-input {
-    width: 100%;
-  }
-
-  .filter-row {
-    grid-template-columns: 1fr;
-  }
-
-  .btn-search {
-    width: 100%;
-    padding: 0.875rem;
-  }
-}
 
 .search-input-wrapper {
   position: relative;
@@ -985,14 +967,29 @@ header p {
   opacity: 0.9;
 }
 
+
+/* Layout Utilities */
 @media (max-width: 640px) {
   .jobs-grid {
     grid-template-columns: 1fr;
   }
-}
 
-.ats-tag {
-  font-family: 'JetBrains Mono', monospace;
+  .search-row {
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-search {
+    width: 100%;
+    padding: 0.875rem;
+  }
 }
 
 
