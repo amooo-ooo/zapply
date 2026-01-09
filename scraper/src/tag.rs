@@ -55,7 +55,7 @@ impl TagEngine {
             }
         }
 
-        // === Software Engineering ===
+        // Software Engineering
         simple!(r"(?i)\brust\b", "Rust");
         simple!(r"(?i)\bpython\b", "Python");
         simple!(r"(?i)\bjavascript\b|(^|[^.])\bjs\b", "JavaScript");
@@ -111,7 +111,7 @@ impl TagEngine {
         simple!(r"(?i)\bgraphql\b", "GraphQL");
         simple!(r"(?i)\brest\b", "REST");
 
-        // === Data & Analytics ===
+        // Data & Analytics
         simple!(r"(?i)\bdata scien(ce|tist)\b", "Data Science");
         simple!(r"(?i)\bmachine learning\b|\bml\b", "Machine Learning");
         simple!(r"(?i)\bartificial intelligence\b|\bai\b", "AI");
@@ -124,7 +124,7 @@ impl TagEngine {
         simple!(r"(?i)\bsql server\b", "SQL Server");
         simple!(r"(?i)\bpostgresql\b|\bpostgres\b", "PostgreSQL");
 
-        // === Product & Design ===
+        // Product & Design
         simple!(r"(?i)\bproduct manage(r|ment)\b|\bpm\b", "Product Management");
         simple!(r"(?i)\bproduct owner\b", "Product Owner");
         simple!(r"(?i)\bui\b|\buser interface\b", "UI");
@@ -133,7 +133,7 @@ impl TagEngine {
         simple!(r"(?i)\bsketch\b", "Sketch");
         simple!(r"(?i)\bgraphic design\b", "Graphic Design");
 
-        // === Marketing & Sales (Strict) ===
+        // Marketing & Sales
         strict_dist!(r"(?i)\bseo\b", "SEO", r"(?i)\b(specialist|optimization|ranking|keyword|content|audit|technical)\b", 15);
         strict_dist!(r"(?i)\bsem\b", "SEM", r"(?i)\b(paid|search|marketing|campaign|ppc|ad)\b", 15);
         simple!(r"(?i)\bcontent marketing\b", "Content Marketing");
@@ -211,6 +211,15 @@ impl TagEngine {
         simple!(r"(?i)\bshopify\b", "Shopify");
         simple!(r"(?i)\bmagento\b", "Magento");
         simple!(r"(?i)\bwoo?commerce\b", "WooCommerce");
+        
+        // Support & Helpdesk
+        simple!(r"(?i)\bhelpdesk\b", "Helpdesk");
+        simple!(r"(?i)\bit support\b", "IT Support");
+        simple!(r"(?i)\btechnical support\b", "Technical Support");
+        simple!(r"(?i)\bservice desk\b", "Service Desk");
+        simple!(r"(?i)\bcustomer (support|service)\b", "Customer Support");
+        simple!(r"(?i)\bvirtual assistant\b", "Virtual Assistant");
+        
         simple!(r"(?i)\bslack\b", "Slack");
         simple!(r"(?i)\bmicrosoft teams\b", "MS Teams");
         simple!(r"(?i)\bjira\b", "Jira");
@@ -328,7 +337,7 @@ impl TagEngine {
         simple!(r"(?i)\binfluencer\b", "Influencer Marketing");
         strict_dist!(r"(?i)\baffiliate\b", "Affiliate Marketing", r"(?i)\b(program|marketing|network|partner)\b", 15);
 
-        // === Finance & Accounting (Strict) ===
+        // Finance & Accounting
         strict_dist!(r"(?i)\baccounting\b", "Accounting", r"(?i)\b(staff|clerk|financial|ledger|payable|receivable|reconciliation|cpa|intern)\b", 15);
         simple!(r"(?i)\bcpa\b", "CPA");
         strict_dist!(r"(?i)\baudit\b", "Audit", r"(?i)\b(internal|external|financial|risk|compliance|it|process|assurance)\b", 15);
@@ -340,7 +349,7 @@ impl TagEngine {
         simple!(r"(?i)\bventure capital\b|\bvc\b", "Venture Capital");
         simple!(r"(?i)\bprivate equity\b|\bpe\b", "Private Equity");
 
-        // === Operations & HR ===
+        // Operations & HR
         simple!(r"(?i)\bsupply chain\b", "Supply Chain");
         simple!(r"(?i)\blogistics\b", "Logistics");
         simple!(r"(?i)\bproject manage(r|ment)\b", "Project Management");
@@ -349,8 +358,27 @@ impl TagEngine {
         simple!(r"(?i)\brecruiting\b|\brecruiter\b", "Recruiting");
         simple!(r"(?i)\btalent acquisition\b", "Talent Acquisition");
         simple!(r"(?i)\bpeople ops\b", "People Ops");
+        simple!(r"(?i)\bhris\b", "HRIS");
+        simple!(r"(?i)\bpayroll\b", "Payroll");
+        simple!(r"(?i)\bbenefits (specialist|admin|manager|administration)\b", "Benefits Specialist");
+        simple!(r"(?i)\bemployee relations\b", "Employee Relations");
+        
+        // Data Collection & Research
+        simple!(r"(?i)\bdata collection\b", "Data Collection");
+        simple!(r"(?i)\bsurveyor\b", "Surveyor");
+        simple!(r"(?i)\bdata entry\b", "Data Entry");
+        simple!(r"(?i)\bmarket research\b", "Market Research");
+        simple!(r"(?i)\bfield researcher\b", "Field Research");
 
-        // === Legal ===
+        // Operations & Facilities
+        simple!(r"(?i)\bprocurement\b", "Procurement");
+        simple!(r"(?i)\binventory (management|controller)\b", "Inventory Management");
+        simple!(r"(?i)\bfacilities (management|manager)\b", "Facilities Management");
+        simple!(r"(?i)\boffice (management|manager)\b", "Office Management");
+        simple!(r"(?i)\breceptionist\b", "Receptionist");
+        simple!(r"(?i)\badministrative assistant\b", "Administrative Assistant");
+
+        // Legal
         strict_dist!(r"(?i)\bcompliance\b", "Compliance", r"(?i)\b(regulatory|legal|risk|policy|standard|gdpr|hipaa|soc2|analyst)\b", 15);
         simple!(r"(?i)\blitigation\b", "Litigation");
         simple!(r"(?i)\bcontract law\b", "Contract Law");
@@ -386,19 +414,32 @@ impl TagEngine {
         simple!(r"(?i)\bbamboohr\b", "BambooHR");
         simple!(r"(?i)\brippling\b", "Rippling");
 
-        // === Hardware & Science ===
+        // Hardware & Science
         simple!(r"(?i)\belectrical engineering\b", "Electrical Engineering");
         simple!(r"(?i)\bmechanical engineering\b", "Mechanical Engineering");
         simple!(r"(?i)\bcivil engineering\b", "Civil Engineering");
         simple!(r"(?i)\bchemical engineering\b", "Chemical Engineering");
         simple!(r"(?i)\bbiomedical\b", "Biomedical");
 
-        // === General & Benefits ===
+        // General & Benefits
         simple!(r"(?i)\blgbtq(\+|\b)", "LGBTQ+ Friendly");
         simple!(r"(?i)\bpaid (internship|role|position)\b", "Paid");
         simple!(r"(?i)\bvisa sponsorship\b", "Visa Sponsorship");
         simple!(r"(?i)\bremote\b", "Remote");
         simple!(r"(?i)\bhybrid\b", "Hybrid");
+        
+        // Software Engineering Roles
+        simple!(r"(?i)\bfrontend\b|\bfront[-\s]end\b", "Frontend");
+        simple!(r"(?i)\bbackend\b|\bback[-\s]end\b", "Backend");
+        simple!(r"(?i)\bfullstack\b|\bfull[-\s]stack\b", "Fullstack");
+        simple!(r"(?i)\bmobile (dev|developer|builder)\b|\bios developer\b|\bandroid developer\b", "Mobile Development");
+        simple!(r"(?i)\bqa\b|\bquality assurance\b|\bsoftware (test|testing)\b", "Quality Assurance");
+        simple!(r"(?i)\bsre\b|\bsite reliability engineering\b", "SRE");
+        simple!(r"(?i)\bcloud architect\b", "Cloud Architect");
+        simple!(r"(?i)\bsecurity engineer\b|\bcybersecurity engineer\b", "Security Engineer");
+
+        // Smart Tags
+        strict_dist!(r"\$|£|€|¥|₹|USD|GBP|EUR", "Paid", r"(?i)\b(salary|wages?|rate|annum|hour|pay|remuneration|compensation|stipend)\b", 10);
 
         let regex_set = RegexSet::new(patterns).expect("Failed to create RegexSet");
 
@@ -1045,5 +1086,52 @@ mod tests {
         // Agile
         assert!(engine.detect_tags("Working in an Agile scrum environment").contains(&"Agile"));
         assert!(!engine.detect_tags("He is very agile on his feet").contains(&"Agile"));
+    }
+
+    #[test]
+    fn test_expanded_tags() {
+        let engine = TagEngine::new();
+        
+        // Helpdesk & IT
+        let tags = engine.detect_tags("IT Support technician for helpdesk and service desk.");
+        let set: HashSet<_> = tags.iter().cloned().collect();
+        assert!(set.contains("IT Support"));
+        assert!(set.contains("Helpdesk"));
+        assert!(set.contains("Service Desk"));
+
+        // HR & People Ops
+        let tags = engine.detect_tags("HRIS Specialist with Payroll and Benefits administration experience.");
+        let set: HashSet<_> = tags.iter().cloned().collect();
+        assert!(set.contains("HRIS"));
+        assert!(set.contains("Payroll"));
+        assert!(set.contains("Benefits Specialist"));
+
+        // Data & Ops
+        let tags = engine.detect_tags("Surveyor for data collection and market research.");
+        let set: HashSet<_> = tags.iter().cloned().collect();
+        assert!(set.contains("Surveyor"));
+        assert!(set.contains("Data Collection"));
+        assert!(set.contains("Market Research"));
+
+        // Engineering Roles
+        let tags = engine.detect_tags("Senior Frontend developer with React and some Backend Node.js knowledge.");
+        let set: HashSet<_> = tags.iter().cloned().collect();
+        assert!(set.contains("Frontend"));
+        assert!(set.contains("Backend"));
+        assert!(set.contains("React"));
+        assert!(set.contains("Node.js"));
+
+        // Paid Smart Tag
+        let tags = engine.detect_tags("Salary: $100,000 per annum.");
+        assert!(tags.contains(&"Paid"));
+        
+        let tags = engine.detect_tags("Hourly rate of $50/hr.");
+        assert!(tags.contains(&"Paid"));
+        
+        let tags = engine.detect_tags("Compensation: USD 80k.");
+        assert!(tags.contains(&"Paid"));
+
+        let tags = engine.detect_tags("We pay well.");
+        assert!(!tags.contains(&"Paid")); // No symbol
     }
 }
