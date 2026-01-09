@@ -18,6 +18,10 @@ const state: GlobalState = {
 // --- DOM Elements ---
 const getElements = () => ({
     themeToggle: document.getElementById('themeToggle'),
+    settingsToggle: document.getElementById('settingsToggle'),
+    settingsDropdown: document.getElementById('settingsDropdown'),
+    paletteToggle: document.getElementById('paletteToggle'),
+    themeMenu: document.getElementById('themeMenu'),
     filterToggle: document.getElementById('filterToggle'),
     filterRow: document.getElementById('filterRow'),
     grid: document.querySelector('.jobs-grid') as HTMLElement,
@@ -67,13 +71,20 @@ class TagInput {
     pillsContainer: HTMLElement
     input: HTMLInputElement
     hiddenInput: HTMLInputElement
+    autocompleteDropdown: HTMLElement | null
     tags: string[] = []
+    suggestions: string[] = []
+    selectedIndex: number = -1
+    debounceTimer: number | null = null
+    apiEndpoint: string | null = null
 
-    constructor(containerId: string, pillsId: string, hiddenInputId: string) {
+    constructor(containerId: string, pillsId: string, hiddenInputId: string, autocompleteId?: string, apiEndpoint?: string) {
         this.container = document.getElementById(containerId) as HTMLElement
         this.pillsContainer = document.getElementById(pillsId) as HTMLElement
         this.hiddenInput = document.getElementById(hiddenInputId) as HTMLInputElement
         this.input = this.container?.querySelector('input') as HTMLInputElement
+        this.autocompleteDropdown = autocompleteId ? document.getElementById(autocompleteId) : null
+        this.apiEndpoint = apiEndpoint || null
 
         if (!this.container || !this.pillsContainer || !this.hiddenInput || !this.input) {
             console.warn(`TagInput: Missing elements for ${containerId}`)
@@ -98,8 +109,12 @@ class TagInput {
 
         this.input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                if (this.input.value.trim()) {
-                    e.preventDefault()
+                e.preventDefault()
+                if (this.selectedIndex >= 0 && this.suggestions.length > 0) {
+                    // Select from autocomplete
+                    this.selectSuggestion(this.selectedIndex)
+                } else if (this.input.value.trim()) {
+                    // Add manually typed value
                     this.addTagFromInput()
                 }
             } else if (e.key === ',') {
@@ -107,10 +122,127 @@ class TagInput {
                 this.addTagFromInput()
             } else if (e.key === 'Backspace' && this.input.value === '' && this.tags.length > 0) {
                 this.removeTag(this.tags.length - 1)
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                if (this.suggestions.length > 0) {
+                    this.selectedIndex = Math.min(this.selectedIndex + 1, this.suggestions.length - 1)
+                    this.renderSuggestions()
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                if (this.suggestions.length > 0) {
+                    this.selectedIndex = Math.max(this.selectedIndex - 1, 0)
+                    this.renderSuggestions()
+                }
+            } else if (e.key === 'Escape') {
+                this.hideAutocomplete()
             }
         })
 
-        this.input.addEventListener('blur', () => this.addTagFromInput())
+        this.input.addEventListener('input', () => {
+            if (this.apiEndpoint) {
+                this.debouncedFetchSuggestions()
+            }
+        })
+
+        this.input.addEventListener('blur', (e) => {
+            // Delay to allow click on suggestion
+            setTimeout(() => {
+                this.addTagFromInput()
+                this.hideAutocomplete()
+            }, 200)
+        })
+
+        this.input.addEventListener('focus', () => {
+            if (this.apiEndpoint && this.input.value) {
+                this.fetchSuggestions(this.input.value)
+            }
+        })
+
+        // Click outside to close
+        document.addEventListener('click', (e) => {
+            if (!this.container.contains(e.target as Node)) {
+                this.hideAutocomplete()
+            }
+        })
+    }
+
+    debouncedFetchSuggestions() {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer)
+        }
+        this.debounceTimer = window.setTimeout(() => {
+            const query = this.input.value.trim()
+            // Only fetch if query is 1+ characters for better discovery
+            if (query.length >= 1) {
+                this.fetchSuggestions(query)
+            } else {
+                this.hideAutocomplete()
+            }
+        }, 250) // Reduced from 300ms to 250ms for snappier feel
+    }
+
+    async fetchSuggestions(query: string) {
+        if (!this.apiEndpoint) return
+
+        try {
+            const res = await fetch(`${this.apiEndpoint}?q=${encodeURIComponent(query)}`)
+            if (res.ok) {
+                const data = await res.json() as string[]
+                this.suggestions = data.filter((s: string) =>
+                    !this.tags.some(t => t.toLowerCase() === s.toLowerCase())
+                )
+                this.selectedIndex = -1
+                this.renderSuggestions()
+            }
+        } catch (e) {
+            console.error('Error fetching suggestions:', e)
+        }
+    }
+
+    renderSuggestions() {
+        if (!this.autocompleteDropdown) return
+
+        if (this.suggestions.length === 0) {
+            this.hideAutocomplete()
+            return
+        }
+
+        this.autocompleteDropdown.innerHTML = ''
+        this.suggestions.forEach((suggestion, index) => {
+            const item = document.createElement('div')
+            item.className = 'autocomplete-item'
+            if (index === this.selectedIndex) {
+                item.classList.add('selected')
+            }
+            item.textContent = suggestion
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault() // Prevent blur
+                this.selectSuggestion(index)
+            })
+            this.autocompleteDropdown!.appendChild(item)
+        })
+
+        this.autocompleteDropdown.classList.add('show')
+    }
+
+    selectSuggestion(index: number) {
+        if (index >= 0 && index < this.suggestions.length) {
+            this.tags.push(this.suggestions[index])
+            this.input.value = ''
+            this.update()
+            this.hideAutocomplete()
+            this.input.focus()
+        }
+    }
+
+    hideAutocomplete() {
+        if (this.autocompleteDropdown) {
+            this.autocompleteDropdown.classList.remove('show')
+            this.autocompleteDropdown.innerHTML = ''
+        }
+        this.suggestions = []
+        this.selectedIndex = -1
     }
 
     addTagFromInput() {
@@ -119,6 +251,7 @@ class TagInput {
             this.tags.push(text)
             this.input.value = ''
             this.update()
+            this.hideAutocomplete()
         }
     }
 
@@ -137,6 +270,8 @@ class TagInput {
         this.tags.forEach((tag, index) => {
             const pill = document.createElement('div')
             pill.className = 'tag-pill'
+            // Apply the same color styling as job card tags
+            pill.setAttribute('style', getTagStyle(tag))
             pill.innerHTML = `
                 <span>${tag}</span>
                 <div class="tag-remove" data-index="${index}">
@@ -253,7 +388,6 @@ const initTheme = () => {
         document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
         document.documentElement.classList.toggle('dark', isDark)
 
-        // Parse URL params for theme selection
         const urlParams = new URLSearchParams(window.location.search)
         const urlTheme = urlParams.get('theme')
         const currentAccent = urlTheme || localStorage.getItem('accentTheme') || 'neutral'
@@ -271,26 +405,43 @@ const initTheme = () => {
 
     setThemeMode(isDark)
 
-    const { themeToggle } = getElements()
-    themeToggle?.addEventListener('click', () => {
+    const elements = getElements()
+
+    // Settings Menu Toggle
+    elements.settingsToggle?.addEventListener('click', (e) => {
+        e.stopPropagation()
+        elements.settingsDropdown?.classList.toggle('open')
+    })
+
+    // Theme (Light/Dark) Toggle
+    elements.themeToggle?.addEventListener('click', (e) => {
+        e.stopPropagation()
         isDark = !isDark
         setThemeMode(isDark)
         localStorage.setItem('theme', isDark ? 'dark' : 'light')
     })
 
     // Palette menu toggle
-    const paletteToggle = document.getElementById('paletteToggle')
-    const themeMenu = document.getElementById('themeMenu')
-
-    paletteToggle?.addEventListener('click', (e) => {
+    elements.paletteToggle?.addEventListener('click', (e) => {
         e.stopPropagation()
-        themeMenu?.classList.toggle('open')
+        elements.themeMenu?.classList.toggle('open')
     })
 
-    // Close menu when clicking outside
+    // Close menus when clicking outside
     document.addEventListener('click', (e) => {
-        if (themeMenu?.classList.contains('open') && !themeMenu.contains(e.target as Node)) {
-            themeMenu.classList.remove('open')
+        const target = e.target as Node
+
+        // Settings dropdown outside click
+        if (elements.settingsDropdown?.classList.contains('open') &&
+            !elements.settingsDropdown.contains(target) &&
+            !elements.settingsToggle?.contains(target)) {
+            elements.settingsDropdown.classList.remove('open')
+        }
+
+        // Palette sub-menu outside click
+        if (elements.themeMenu?.classList.contains('open') &&
+            !elements.themeMenu.contains(target)) {
+            elements.themeMenu.classList.remove('open')
         }
     })
 
@@ -301,8 +452,7 @@ const initTheme = () => {
             if (themeId) {
                 localStorage.setItem('accentTheme', themeId)
                 applyThemeColors(themeId, isDark)
-                // Optionally close menu after selection
-                themeMenu?.classList.remove('open')
+                elements.themeMenu?.classList.remove('open')
             }
         })
     })
@@ -654,9 +804,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme()
     initFilters()
     new TagInput('locationTagContainer', 'locationPills', 'locationInput')
-    new TagInput('tagTagContainer', 'tagPills', 'tagInput')
-    new TagInput('sourceTagContainer', 'sourcePills', 'sourceInput')
-    new TagInput('fieldTagContainer', 'fieldPills', 'fieldInput')
+    new TagInput('tagTagContainer', 'tagPills', 'tagInput', 'tagAutocomplete', '/api/tags/suggestions')
+    new TagInput('companyTagContainer', 'companyPills', 'companyInput', 'companyAutocomplete', '/api/companies/suggestions')
+    new TagInput('sourceTagContainer', 'sourcePills', 'sourceInput', 'sourceAutocomplete', '/api/sources/suggestions')
+    new TagInput('fieldTagContainer', 'fieldPills', 'fieldInput', 'fieldAutocomplete', '/api/fields/suggestions')
     initJobDetails()
     initInfiniteScroll()
 })

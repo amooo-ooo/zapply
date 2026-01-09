@@ -28,14 +28,33 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-.theme-controls {
+.settings-menu-container {
   position: fixed;
   top: 1.5rem;
-  right: 2rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  right: 1.5rem;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 1001;
+  transform: translateY(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+  opacity: 0;
+}
+
+.settings-dropdown.open {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .theme-menu {
@@ -58,8 +77,6 @@
 
 .theme-menu.open .theme-options {
   pointer-events: auto;
-  opacity: 1;
-  visibility: visible;
 }
 
 .theme-pill {
@@ -88,7 +105,7 @@
 .theme-menu.open .theme-pill {
   opacity: 1;
   visibility: visible;
-  --rotation: calc((var(--index) * -24deg) + 8deg);
+  --rotation: calc((var(--index) * -24deg) + 36deg);
   --radius: 34px;
   transform:
     translateY(-50%) rotate(var(--rotation)) translateX(calc(var(--radius) * -1)) scale(1);
@@ -542,7 +559,7 @@ header p {
 .search-container {
   margin-bottom: 2rem;
   width: 100%;
-  max-width: 650px;
+  max-width: 675px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -569,6 +586,10 @@ header p {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.filter-group-full {
+  grid-column: 1 / -1;
 }
 
 .filter-label {
@@ -1110,6 +1131,7 @@ header p {
 
 /* Smart Tag Input Styles */
 .tag-input-container {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1135,15 +1157,21 @@ header p {
 }
 
 .tag-pill {
+  /* Use same color variables as job card tags */
+  --tag-hue: 215;
+  --tag-bg: light-dark(hsla(var(--tag-hue), 80%, 96%, 0.8), hsla(var(--tag-hue), 40%, 15%, 0.8));
+  --tag-text: light-dark(hsl(var(--tag-hue), 80%, 25%), hsl(var(--tag-hue), 80%, 85%));
+  --tag-border: light-dark(hsl(var(--tag-hue), 60%, 85%), hsl(var(--tag-hue), 40%, 30%));
+
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
-  background: var(--bg-card);
-  border: 1px dashed var(--border-color);
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  border: 1px solid var(--tag-border);
   border-radius: 6px;
   font-size: 0.875rem;
-  color: var(--text-primary);
   line-height: 1;
   white-space: nowrap;
   animation: scaleIn 0.15s ease-out;
@@ -1193,6 +1221,60 @@ header p {
 
 .tag-input-field::placeholder {
   color: var(--text-secondary);
+}
+
+/* Autocomplete Dropdown Styles */
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-top: 0.25rem;
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+  z-index: 100;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.autocomplete-dropdown.show {
+  display: block;
+}
+
+.autocomplete-item {
+  padding: 0.625rem 0.875rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  transition: background-color 0.15s;
+  user-select: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+  background: var(--bg-muted);
+}
+
+.autocomplete-item:first-child {
+  border-radius: 7px 7px 0 0;
+}
+
+.autocomplete-item:last-child {
+  border-radius: 0 0 7px 7px;
+}
+
+.autocomplete-item:only-child {
+  border-radius: 7px;
+}
+
+.autocomplete-empty {
+  padding: 0.875rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .search-input::placeholder {

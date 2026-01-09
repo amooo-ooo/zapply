@@ -377,8 +377,6 @@ impl JobDb for RemoteD1 {
 
 // --- Utilities ---
 
-// --- Utilities ---
-
 fn load_json<T: for<'a> Deserialize<'a>>(path: &str) -> Result<T> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read file: {}", path))?;

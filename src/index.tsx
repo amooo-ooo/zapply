@@ -4,17 +4,18 @@ import type { Job } from './types'
 
 import { cache } from 'hono/cache'
 
-type Env = {
+export type Env = {
   Bindings: {
     DB: D1Database
     LOGO_DEV_TOKEN: string
   }
 }
 
-type SearchParams = {
+export type SearchParams = {
   query?: string
   location?: string
   tag?: string
+  company?: string
   source?: string
   degree?: string
   field?: string
@@ -31,9 +32,12 @@ app.use('*', cache({
 
 app.use(renderer)
 
+import api from './routes/api'
+app.route('/api', api)
+
 // Helper functions
 
-const getTagStyle = (name: string) => {
+export const getTagStyle = (name: string) => {
   const hues = [
     217, // Blue
     142, // Green
@@ -54,7 +58,7 @@ const getTagStyle = (name: string) => {
   return `--tag-hue: ${h};`
 }
 
-const formatDate = (dateString: string) => {
+export const formatDate = (dateString: string) => {
   if (!dateString) return ''
   try {
     const date = new Date(dateString)
@@ -64,7 +68,7 @@ const formatDate = (dateString: string) => {
   }
 }
 
-const formatAts = (ats: string) => {
+export const formatAts = (ats: string) => {
   if (!ats) return ''
   return ats.replace(/['"]+/g, '').replace(/\b\w/g, (l) => l.toUpperCase())
 }
@@ -83,7 +87,7 @@ const formatLocation = (loc: string) => {
 
 
 
-const JobCard = ({ job, token }: { job: Job; token: string }) => {
+export const JobCard = ({ job, token }: { job: Job; token: string }) => {
   const iconLetter = job.company ? job.company.charAt(0) : '?'
 
   // Resolve logo query dynamically
@@ -213,11 +217,12 @@ const JobCard = ({ job, token }: { job: Job; token: string }) => {
     </div>
   )
 }
-const getSearchParams = (c: any): SearchParams => {
+export const getSearchParams = (c: any): SearchParams => {
   return {
     query: c.req.query('q'),
     location: c.req.query('location'),
     tag: c.req.query('tag'),
+    company: c.req.query('company'),
     source: c.req.query('source'),
     degree: c.req.query('degree'),
     field: c.req.query('field'),
@@ -226,7 +231,7 @@ const getSearchParams = (c: any): SearchParams => {
   }
 }
 
-const getJobs = async (
+export const getJobs = async (
   db: D1Database,
   params: SearchParams
 ): Promise<{ jobs: Job[]; total: number; companyCount: number; latency: number }> => {
@@ -267,6 +272,17 @@ const getJobs = async (
       whereClause += ` AND id IN (SELECT job_id FROM job_tags WHERE ${conditions})`
       tags.forEach(tag => {
         sqlParams.push(`%${escapeLike(tag)}%`)
+      })
+    }
+  }
+
+  if (params.company) {
+    const companies = params.company.split(',').map(c => c.trim()).filter(Boolean)
+    if (companies.length > 0) {
+      const conditions = companies.map(() => 'company LIKE ? ESCAPE "\\"').join(' OR ')
+      whereClause += ` AND (${conditions})`
+      companies.forEach(company => {
+        sqlParams.push(`%${escapeLike(company)}%`)
       })
     }
   }
@@ -423,31 +439,39 @@ const ThemeSelector = () => (
   </div>
 )
 
-const ThemeToggle = () => (
-  <div class="theme-controls">
-    <ThemeSelector />
-    <button id="themeToggle" class="theme-toggle" title="Toggle Light/Dark" aria-label="Toggle Theme">
-      <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-      </svg>
-      <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+const SettingsMenu = () => (
+  <div class="settings-menu-container">
+    <button id="settingsToggle" class="theme-toggle" title="Settings" aria-label="Settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
       </svg>
     </button>
+    <div class="settings-dropdown" id="settingsDropdown">
+      <button id="themeToggle" class="theme-toggle" title="Toggle Light/Dark" aria-label="Toggle Theme">
+        <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+      <ThemeSelector />
+    </div>
   </div>
 )
 
 const SearchFilters = ({ params, total, companyCount, latency }: { params: SearchParams; total: number; companyCount: number; latency: number }) => {
-  const { query, location, tag, source, posted, degree, field } = params
-  const isFilterVisible = location || tag || source || posted || degree || field
+  const { query, location, tag, company, source, posted, degree, field } = params
+  const isFilterVisible = location || tag || company || source || posted || degree || field
 
   return (
     <div class="search-container">
@@ -489,21 +513,15 @@ const SearchFilters = ({ params, total, companyCount, latency }: { params: Searc
         <div class="filter-row" id="filterRow" style={isFilterVisible ? '' : 'display: none;'}>
           <input type="hidden" name="location" id="locationInput" value={location || ''} />
           <input type="hidden" name="tag" id="tagInput" value={tag || ''} />
+          <input type="hidden" name="company" id="companyInput" value={company || ''} />
           <input type="hidden" name="source" id="sourceInput" value={source || ''} />
 
-          <div class="filter-group">
-            <label class="filter-label">Location</label>
-            <div class="tag-input-container" id="locationTagContainer">
-              <div class="tag-pills" id="locationPills"></div>
-              <input type="text" class="tag-input-field" placeholder="e.g. London, Remote" autocomplete="off" />
-            </div>
-          </div>
-
-          <div class="filter-group">
+          <div class="filter-group filter-group-full">
             <label class="filter-label">Tags</label>
             <div class="tag-input-container" id="tagTagContainer">
               <div class="tag-pills" id="tagPills"></div>
               <input type="text" class="tag-input-field" placeholder="e.g. Python, React" autocomplete="off" />
+              <div class="autocomplete-dropdown" id="tagAutocomplete"></div>
             </div>
           </div>
 
@@ -524,14 +542,24 @@ const SearchFilters = ({ params, total, companyCount, latency }: { params: Searc
             <div class="tag-input-container" id="fieldTagContainer">
               <div class="tag-pills" id="fieldPills"></div>
               <input type="text" class="tag-input-field" placeholder="e.g. Computer Science" autocomplete="off" />
+              <div class="autocomplete-dropdown" id="fieldAutocomplete"></div>
             </div>
           </div>
 
           <div class="filter-group">
-            <label class="filter-label">Source</label>
-            <div class="tag-input-container" id="sourceTagContainer">
-              <div class="tag-pills" id="sourcePills"></div>
-              <input type="text" class="tag-input-field" placeholder="e.g. Greenhouse, Ashby" autocomplete="off" />
+            <label class="filter-label">Company</label>
+            <div class="tag-input-container" id="companyTagContainer">
+              <div class="tag-pills" id="companyPills"></div>
+              <input type="text" class="tag-input-field" placeholder="e.g. Google, Microsoft" autocomplete="off" />
+              <div class="autocomplete-dropdown" id="companyAutocomplete"></div>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Location</label>
+            <div class="tag-input-container" id="locationTagContainer">
+              <div class="tag-pills" id="locationPills"></div>
+              <input type="text" class="tag-input-field" placeholder="e.g. London, Remote" autocomplete="off" />
             </div>
           </div>
 
@@ -544,6 +572,15 @@ const SearchFilters = ({ params, total, companyCount, latency }: { params: Searc
               <option value="7d" selected={posted === '7d'}>Past Week</option>
               <option value="30d" selected={posted === '30d'}>Past Month</option>
             </select>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Source</label>
+            <div class="tag-input-container" id="sourceTagContainer">
+              <div class="tag-pills" id="sourcePills"></div>
+              <input type="text" class="tag-input-field" placeholder="e.g. Greenhouse, Ashby" autocomplete="off" />
+              <div class="autocomplete-dropdown" id="sourceAutocomplete"></div>
+            </div>
           </div>
         </div>
       </form>
@@ -634,7 +671,7 @@ app.get('/', async (c) => {
   // @ts-ignore
   return c.render(
     <>
-      <ThemeToggle />
+      <SettingsMenu />
       <header>
         <div class="header-title">
           <h1>Explore Roles</h1>
@@ -660,51 +697,6 @@ app.get('/', async (c) => {
     </>,
     { logoDevToken: c.env.LOGO_DEV_TOKEN || '' }
   )
-})
-
-app.get('/api/jobs', async (c) => {
-  const params = getSearchParams(c)
-  const { jobs } = await getJobs(c.env.DB, params)
-
-  if (jobs.length === 0) {
-    return c.body(null, 204) // No content
-  }
-
-  return c.html(
-    <>
-      {jobs.map((job) => <JobCard job={job} token={c.env.LOGO_DEV_TOKEN || ''} />)}
-    </>
-  )
-})
-
-app.get('/api/job/:id', async (c) => {
-  const id = c.req.param('id')
-
-  try {
-    // Fetch job metadata and all relations in a single batch
-    const [jobRes, tagsRes, deptsRes, degreesRes, subjectsRes] = await c.env.DB.batch([
-      c.env.DB.prepare('SELECT * FROM jobs WHERE id = ?').bind(id),
-      c.env.DB.prepare('SELECT name FROM job_tags WHERE job_id = ?').bind(id),
-      c.env.DB.prepare('SELECT name FROM job_departments WHERE job_id = ?').bind(id),
-      c.env.DB.prepare('SELECT name FROM job_degree_levels WHERE job_id = ?').bind(id),
-      c.env.DB.prepare('SELECT name FROM job_subject_areas WHERE job_id = ?').bind(id)
-    ])
-
-    if (jobRes.results.length === 0) {
-      return c.json({ error: 'Job not found' }, 404)
-    }
-
-    const job = jobRes.results[0] as any
-    job.tags = (tagsRes.results as any[]).map(t => t.name)
-    job.departments = (deptsRes.results as any[]).map(d => d.name)
-    job.degree_levels = (degreesRes.results as any[]).map(d => d.name)
-    job.subject_areas = (subjectsRes.results as any[]).map(s => s.name)
-
-    return c.json(job)
-  } catch (e) {
-    console.error('D1 Error:', e)
-    return c.json({ error: 'Database error' }, 500)
-  }
 })
 
 export default app
