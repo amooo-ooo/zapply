@@ -2,7 +2,6 @@ use std::env;
 
 pub struct Config {
     pub slugs_file: String,
-    pub cache_file: String,
     pub concurrency: usize,
     pub keywords_regex: String,
     pub negative_keywords_regex: String,
@@ -12,7 +11,6 @@ impl Config {
     pub fn load() -> Self {
         Self {
             slugs_file: env::var("SLUGS_FILE").unwrap_or_else(|_| "slugs.json".to_string()),
-            cache_file: env::var("CACHE_FILE").unwrap_or_else(|_| "cache.json".to_string()),
             concurrency: env::var("CONCURRENCY")
                 .ok()
                 .and_then(|s| s.parse().ok())

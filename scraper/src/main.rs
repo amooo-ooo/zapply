@@ -384,13 +384,6 @@ fn load_json<T: for<'a> Deserialize<'a>>(path: &str) -> Result<T> {
         .with_context(|| format!("Failed to parse JSON from: {}", path))
 }
 
-fn save_json<T: Serialize>(path: &str, data: &T) -> Result<()> {
-    let content = serde_json::to_string_pretty(data)
-        .context("Failed to serialize data to JSON")?;
-    fs::write(path, content)
-        .with_context(|| format!("Failed to write to file: {}", path))?;
-    Ok(())
-}
 
 // --- Scraper Implementation ---
 
@@ -737,9 +730,7 @@ async fn main() -> Result<()> {
     }
 
     info!("Fetching existing job IDs from database...");
-    let existing_ids = db.get_existing_ids().await?;
-    let mut cache: HashSet<String> = load_json(&config.cache_file).unwrap_or_default();
-    cache.extend(existing_ids);
+    let seen_ids = db.get_existing_ids().await?;
     
     let log_file = args.iter()
         .find_map(|a| a.strip_prefix("--log-file="))
@@ -776,7 +767,7 @@ async fn main() -> Result<()> {
 
     const BATCH_SIZE: usize = 100;
     let batch_buffer = Arc::new(Mutex::new(Vec::new()));
-    let cache = Arc::new(Mutex::new(cache));
+    let seen_ids = Arc::new(Mutex::new(seen_ids));
     let db = Arc::new(db);
 
     let mut stream = stream::iter(companies)
@@ -793,7 +784,7 @@ async fn main() -> Result<()> {
             let failures_count = failures_count.clone();
             let inserted_count = inserted_count.clone();
             let batch_buffer = batch_buffer.clone();
-            let cache = cache.clone();
+            let seen_ids = seen_ids.clone();
             let db = db.clone();
 
             async move {
@@ -819,14 +810,14 @@ async fn main() -> Result<()> {
 
                 // Add to batch buffer
                 let mut buffer = batch_buffer.lock().unwrap();
-                let mut cache_guard = cache.lock().unwrap();
+                let mut seen_ids_guard = seen_ids.lock().unwrap();
                 
                 for job in jobs {
-                    if cache_guard.insert(job.id.clone()) {
+                    if seen_ids_guard.insert(job.id.clone()) {
                         buffer.push(job);
                     }
                 }
-
+                
                 // Check if we need to flush
                 let should_flush = buffer.len() >= BATCH_SIZE;
                 let jobs_to_insert = if should_flush {
@@ -835,7 +826,7 @@ async fn main() -> Result<()> {
                     Vec::new()
                 };
                 drop(buffer);
-                drop(cache_guard);
+                drop(seen_ids_guard);
 
                 // Flush batch if needed
                 if !jobs_to_insert.is_empty() {
@@ -872,13 +863,6 @@ async fn main() -> Result<()> {
     }
 
     pb.finish_with_message(format!("Done! Inserted {} jobs.", inserted_count.load(Ordering::SeqCst)));
-
-    // Save updated cache
-    let final_cache = {
-        let cache_guard = cache.lock().unwrap();
-        cache_guard.iter().cloned().collect::<Vec<_>>()
-    };
-    save_json(&config.cache_file, &final_cache)?;
 
     Ok(())
 }
