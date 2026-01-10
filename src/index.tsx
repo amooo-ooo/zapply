@@ -1,5 +1,5 @@
 import { Context, Hono } from 'hono'
-import { getCookie } from 'hono/cookie'
+import { getCookie, setCookie } from 'hono/cookie'
 import { renderer } from './renderer'
 import type { Job } from './types'
 
@@ -27,7 +27,7 @@ export type SearchParams = {
 
 const app = new Hono<Env>()
 
-app.use('*', cache({
+app.use('/api/*', cache({
   cacheName: 'zapply-cache',
   cacheControl: 'max-age=60',
 }))
@@ -227,6 +227,7 @@ const getDetectedLocation = (c: Context<Env>): string | undefined => {
 
   const parts = []
   if (cf.city) parts.push(cf.city)
+  if (cf.region) parts.push(cf.region)
   if (cf.country) parts.push(cf.country)
 
   return parts.length > 0 ? parts.join(', ') : undefined
@@ -245,12 +246,23 @@ export const getSearchParams = (c: Context<Env>): SearchParams => {
   const locationMode = getCookie(c, 'location')
 
   // Active search filters in URL (excluding page/job/theme)
-  const hasActiveFilters = !!(query || tag || company || source || degree || field || posted || queryLocation !== undefined)
+  // We check for undefined to distinguish between "not present" and "empty string" (explicitly cleared)
+  const hasActiveFilters = !!(
+    (query && query.trim()) ||
+    (tag && tag.trim()) ||
+    (company && company.trim()) ||
+    (source && source.trim()) ||
+    (degree && degree.trim()) ||
+    (field && field.trim()) ||
+    (posted && posted.trim()) ||
+    (queryLocation !== undefined)
+  )
 
   const detectedLocation = getDetectedLocation(c)
 
-  // Auto-detect only on fresh arrival (no filters/job) and if not manually cleared (cookie)
-  const shouldAutoDetect = !hasActiveFilters && !job && locationMode !== 'manual'
+  // Auto-detect only on fresh arrival (no other filters) and if not manually cleared (cookie)
+  // We now allow it even if a job ID is present, as long as no manual location is set
+  const shouldAutoDetect = !hasActiveFilters && locationMode !== 'manual'
   const location = queryLocation !== undefined ? queryLocation : (shouldAutoDetect ? detectedLocation : undefined)
 
   return {
@@ -507,7 +519,7 @@ const SettingsMenu = () => (
 
 const SearchFilters = ({ params, total, companyCount, latency }: { params: SearchParams; total: number; companyCount: number; latency: number }) => {
   const { query, location, tag, company, source, posted, degree, field, isDetected } = params
-  const isFilterVisible = (location && !isDetected) || tag || company || source || posted || degree || field
+  const isFilterVisible = location || tag || company || source || posted || degree || field
 
   return (
     <div class="search-container">
@@ -702,6 +714,15 @@ const DetailPanel = () => (
 )
 
 app.get('/', async (c) => {
+  const queryLocation = c.req.query('location')
+  if (queryLocation !== undefined) {
+    setCookie(c, 'location', 'manual', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      sameSite: 'Lax',
+    })
+  }
+
   const params = getSearchParams(c)
   const { jobs, total, companyCount, latency } = await getJobs(c.env.DB, params)
 

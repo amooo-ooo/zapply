@@ -488,8 +488,11 @@ const initFilters = () => {
         setCookie('location', 'manual')
 
         for (const [key, value] of formData.entries()) {
-            if (value && value.toString().trim()) {
-                params.append(key, value.toString().trim())
+            const val = value.toString().trim()
+            // Always include location if it's explicitly in the form (even if empty) 
+            // to signal "worldwide" to the server
+            if (val || key === 'location') {
+                params.append(key, val)
             }
         }
 
@@ -786,6 +789,10 @@ const initInfiniteScroll = () => {
             } else {
                 const html = await res.text()
                 if (html) {
+                    // Clear "No results found" if we're successfully loading more jobs
+                    const noResults = grid.querySelector('.no-results')
+                    if (noResults) noResults.remove()
+
                     const div = document.createElement('div')
                     div.innerHTML = html
                     Array.from(div.children).forEach(child => grid.appendChild(child))

@@ -176,19 +176,13 @@ pub struct SmartRecruitersResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SmartRecruitersJob {
     pub id: String,
-    pub uuid: String,
     pub name: String,
     pub released_date: Option<String>,
     pub location: SmartRecruitersLocation,
     pub department: Option<SmartRecruitersLabel>,
-    pub company: Option<SmartRecruitersCompany>,
-    pub industry: Option<SmartRecruitersIdLabel>,
-    pub function: Option<SmartRecruitersIdLabel>,
     pub type_of_employment: Option<SmartRecruitersIdLabel>,
-    pub experience_level: Option<SmartRecruitersIdLabel>,
     pub custom_field: Option<Vec<SmartRecruitersCustomField>>,
     pub posting_url: Option<String>,
-    pub apply_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -197,12 +191,6 @@ pub struct SmartRecruitersLocation {
     pub city: Option<String>,
     pub region: Option<String>,
     pub country: Option<String>,
-    pub address: Option<String>,
-    pub postal_code: Option<String>,
-    pub remote: Option<bool>,
-    pub hybrid: Option<bool>,
-    pub latitude: Option<String>,
-    pub longitude: Option<String>,
     pub full_location: Option<String>,
 }
 
@@ -212,23 +200,14 @@ pub struct SmartRecruitersLabel {
 }
 
 #[derive(Deserialize)]
-pub struct SmartRecruitersCompany {
-    pub name: String,
-    pub identifier: String,
-}
-
-#[derive(Deserialize)]
 pub struct SmartRecruitersIdLabel {
-    pub id: Option<String>,
     pub label: Option<String>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SmartRecruitersCustomField {
-    pub field_id: String,
     pub field_label: String,
-    pub value_id: Option<String>,
     pub value_label: Option<String>,
 }
 
@@ -264,7 +243,6 @@ pub struct SmartRecruitersJobAd {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SmartRecruitersSections {
-    pub company_description: Option<SmartRecruitersSection>,
     pub job_description: Option<SmartRecruitersSection>,
     pub qualifications: Option<SmartRecruitersSection>,
     pub additional_information: Option<SmartRecruitersSection>,
@@ -331,7 +309,6 @@ pub struct RecruiteeOfferDetail {
 #[derive(Deserialize)]
 pub struct BreezyJob {
     pub id: String,
-    pub friendly_id: Option<String>,
     pub name: String,
     pub url: Option<String>,
     pub published_date: Option<String>,
@@ -340,17 +317,11 @@ pub struct BreezyJob {
     pub location: Option<BreezyLocation>,
     pub department: Option<String>,
     pub salary: Option<String>,
-    pub company: Option<BreezyCompany>,
 }
 
 #[derive(Deserialize)]
 pub struct BreezyType {
     pub name: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct BreezyCompany {
-    pub name: String,
 }
 
 #[derive(Deserialize)]
