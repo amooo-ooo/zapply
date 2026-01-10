@@ -1,4 +1,5 @@
-import { Hono } from 'hono'
+import { Context, Hono } from 'hono'
+import { getCookie } from 'hono/cookie'
 import { renderer } from './renderer'
 import type { Job } from './types'
 
@@ -21,6 +22,7 @@ export type SearchParams = {
   field?: string
   posted?: string
   page?: number
+  isDetected?: boolean
 }
 
 const app = new Hono<Env>()
@@ -219,17 +221,49 @@ export const JobCard = ({ job, token }: { job: Job; token: string }) => {
     </article>
   )
 }
-export const getSearchParams = (c: any): SearchParams => {
+const getDetectedLocation = (c: Context<Env>): string | undefined => {
+  const cf = (c.req.raw as any).cf
+  if (!cf) return undefined
+
+  const parts = []
+  if (cf.city) parts.push(cf.city)
+  if (cf.country) parts.push(cf.country)
+
+  return parts.length > 0 ? parts.join(', ') : undefined
+}
+
+export const getSearchParams = (c: Context<Env>): SearchParams => {
+  const query = c.req.query('q')
+  const tag = c.req.query('tag')
+  const company = c.req.query('company')
+  const source = c.req.query('source')
+  const degree = c.req.query('degree')
+  const field = c.req.query('field')
+  const posted = c.req.query('posted')
+  const queryLocation = c.req.query('location')
+  const job = c.req.query('job')
+  const locationMode = getCookie(c, 'location')
+
+  // Active search filters in URL (excluding page/job/theme)
+  const hasActiveFilters = !!(query || tag || company || source || degree || field || posted || queryLocation !== undefined)
+
+  const detectedLocation = getDetectedLocation(c)
+
+  // Auto-detect only on fresh arrival (no filters/job) and if not manually cleared (cookie)
+  const shouldAutoDetect = !hasActiveFilters && !job && locationMode !== 'manual'
+  const location = queryLocation !== undefined ? queryLocation : (shouldAutoDetect ? detectedLocation : undefined)
+
   return {
-    query: c.req.query('q'),
-    location: c.req.query('location'),
-    tag: c.req.query('tag'),
-    company: c.req.query('company'),
-    source: c.req.query('source'),
-    degree: c.req.query('degree'),
-    field: c.req.query('field'),
-    posted: c.req.query('posted'),
+    query,
+    location,
+    tag,
+    company,
+    source,
+    degree,
+    field,
+    posted,
     page: parseInt(c.req.query('page') || '1'),
+    isDetected: queryLocation === undefined && shouldAutoDetect && !!detectedLocation
   }
 }
 
@@ -472,8 +506,8 @@ const SettingsMenu = () => (
 )
 
 const SearchFilters = ({ params, total, companyCount, latency }: { params: SearchParams; total: number; companyCount: number; latency: number }) => {
-  const { query, location, tag, company, source, posted, degree, field } = params
-  const isFilterVisible = location || tag || company || source || posted || degree || field
+  const { query, location, tag, company, source, posted, degree, field, isDetected } = params
+  const isFilterVisible = (location && !isDetected) || tag || company || source || posted || degree || field
 
   return (
     <div class="search-container">

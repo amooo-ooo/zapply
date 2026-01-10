@@ -65,6 +65,11 @@ const getTagStyle = (name: string) => {
     return `--tag-hue: ${h};`
 }
 
+const setCookie = (name: string, value: string, days: number = 30) => {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString()
+    document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`
+}
+
 // --- Tag Input Class ---
 class TagInput {
     container: HTMLElement
@@ -77,6 +82,7 @@ class TagInput {
     selectedIndex: number = -1
     debounceTimer: number | null = null
     apiEndpoint: string | null = null
+    onUpdate: ((tags: string[]) => void) | null = null
 
     constructor(containerId: string, pillsId: string, hiddenInputId: string, autocompleteId?: string, apiEndpoint?: string) {
         this.container = document.getElementById(containerId) as HTMLElement
@@ -85,6 +91,7 @@ class TagInput {
         this.input = this.container?.querySelector('input') as HTMLInputElement
         this.autocompleteDropdown = autocompleteId ? document.getElementById(autocompleteId) : null
         this.apiEndpoint = apiEndpoint || null
+        this.onUpdate = null
 
         if (!this.container || !this.pillsContainer || !this.hiddenInput || !this.input) {
             console.warn(`TagInput: Missing elements for ${containerId}`)
@@ -109,15 +116,16 @@ class TagInput {
 
         this.input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                e.preventDefault()
                 if (this.selectedIndex >= 0 && this.suggestions.length > 0) {
-                    // Select from autocomplete
+                    e.preventDefault()
                     this.selectSuggestion(this.selectedIndex)
                 } else if (this.input.value.trim()) {
-                    // Add manually typed value
+                    e.preventDefault()
                     this.addTagFromInput()
                 }
-            } else if (e.key === ',') {
+                // If empty, Enter bubbles and submits the form
+            }
+            else if (e.key === ',') {
                 e.preventDefault()
                 this.addTagFromInput()
             } else if (e.key === 'Backspace' && this.input.value === '' && this.tags.length > 0) {
@@ -263,6 +271,9 @@ class TagInput {
     update() {
         this.hiddenInput.value = this.tags.join(',')
         this.renderPills()
+        if (this.onUpdate) {
+            this.onUpdate(this.tags)
+        }
     }
 
     renderPills() {
@@ -472,6 +483,9 @@ const initFilters = () => {
         e.preventDefault()
         const formData = new FormData(searchForm)
         const params = new URLSearchParams()
+
+        // Disable auto-location once user takes manual control
+        setCookie('location', 'manual')
 
         for (const [key, value] of formData.entries()) {
             if (value && value.toString().trim()) {
@@ -819,7 +833,9 @@ const initInfiniteScroll = () => {
 document.addEventListener('DOMContentLoaded', () => {
     initTheme()
     initFilters()
-    new TagInput('locationTagContainer', 'locationPills', 'locationInput')
+    const locationTagInput = new TagInput('locationTagContainer', 'locationPills', 'locationInput')
+    locationTagInput.onUpdate = () => setCookie('location', 'manual')
+
     new TagInput('tagTagContainer', 'tagPills', 'tagInput', 'tagAutocomplete', '/api/tags/suggestions')
     new TagInput('companyTagContainer', 'companyPills', 'companyInput', 'companyAutocomplete', '/api/companies/suggestions')
     new TagInput('sourceTagContainer', 'sourcePills', 'sourceInput', 'sourceAutocomplete', '/api/sources/suggestions')
