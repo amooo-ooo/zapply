@@ -214,13 +214,44 @@ impl AtsType {
         let resp: SmartRecruitersResponse = serde_json::from_value(data.clone())
             .context(format!("SmartRecruiters parsing failed for {}", company.name))?;
         Ok(resp.content.into_iter().map(|j| {
-            let url = format!("https://jobs.smartrecruiters.com/{}/{}", company.slug, j.id);
+            let url = j.posting_url.unwrap_or_else(|| format!("https://jobs.smartrecruiters.com/{}/{}", company.slug, j.id));
             let mut job = self.new_job(company, j.id.clone(), j.name, url);
-            job.location = format!("{}, {}", j.location.city.unwrap_or_default(), j.location.country.unwrap_or_default());
+            
+            // Build location string
+            let loc = &j.location;
+            let mut loc_parts = Vec::new();
+            if let Some(city) = &loc.city { if !city.is_empty() { loc_parts.push(city.as_str()); } }
+            if let Some(region) = &loc.region { if !region.is_empty() { loc_parts.push(region.as_str()); } }
+            if let Some(country) = &loc.country { if !country.is_empty() { loc_parts.push(country.as_str()); } }
+            
+            job.location = if loc_parts.is_empty() {
+                loc.full_location.clone().unwrap_or_default()
+            } else {
+                loc_parts.join(", ")
+            };
+            
             job.posted = normalize_date(&j.released_date.unwrap_or_default());
+            
             if let Some(dept) = j.department.and_then(|d| d.label) {
-                job.departments.push(dept);
+                if !dept.is_empty() { job.departments.push(dept); }
             }
+
+            // Extract tags from custom fields or employment type
+            if let Some(emp_type) = j.type_of_employment.and_then(|t| t.label) {
+                if !emp_type.is_empty() { job.tags.push(emp_type); }
+            }
+
+            if let Some(custom_fields) = j.custom_field {
+                for field in custom_fields {
+                    // Example: "Remote", "Work Space", etc.
+                    if field.field_label.contains("Work Space") || field.field_label.contains("Remote") {
+                        if let Some(val) = field.value_label {
+                            if !val.is_empty() { job.tags.push(val); }
+                        }
+                    }
+                }
+            }
+
             job
         }).collect())
     }
@@ -303,15 +334,134 @@ impl AtsType {
         let items: Vec<BreezyJob> = serde_json::from_value(data.clone())
             .context(format!("Breezy parsing failed for {}", company.name))?;
         Ok(items.into_iter().map(|j| {
-            let url = format!("https://{}.breezy.hr/p/{}", company.slug, j.id);
+            let url = j.url.clone().unwrap_or_else(|| format!("https://{}.breezy.hr/p/{}", company.slug, j.id));
             let mut job = self.new_job(company, j.id, j.name, url);
-            job.description = clean_html(&j.description.unwrap_or_default());
-            job.location = j.location.and_then(|l| l.name).unwrap_or_default();
-            job.posted = normalize_date(&j.updated_at.unwrap_or_default());
-            if let Some(dept) = j.department {
-                job.departments.push(dept);
+            
+            // Build location string
+            if let Some(loc) = &j.location {
+                let mut loc_parts = Vec::new();
+                if let Some(name) = &loc.name { if !name.is_empty() { loc_parts.push(name.as_str()); } }
+                if let Some(country) = &loc.country.as_ref().and_then(|c| c.name.as_ref()) {
+                    if !country.is_empty() { loc_parts.push(country.as_str()); }
+                }
+                job.location = loc_parts.join(", ");
+
+                // Tag remote
+                if loc.is_remote == Some(true) {
+                    job.tags.push("Remote".to_string());
+                }
+                if let Some(remote_label) = loc.remote_details.as_ref().and_then(|r| r.label.as_ref()) {
+                    if !remote_label.is_empty() {
+                        job.tags.push(remote_label.clone());
+                    }
+                }
             }
+
+            job.posted = normalize_date(&j.published_date.unwrap_or_default());
+            
+            if let Some(dept) = j.department {
+                if !dept.is_empty() { job.departments.push(dept); }
+            }
+
+            if let Some(emp_type) = j.employment_type.and_then(|t| t.name) {
+                if !emp_type.is_empty() { job.tags.push(emp_type); }
+            }
+
+            if let Some(salary) = j.salary {
+                if !salary.is_empty() { job.tags.push(format!("Salary: {}", salary)); }
+            }
+
             job
         }).collect())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_parse_smartrecruiters() {
+        let company = CompanyEntry {
+            name: "Air New Zealand".to_string(),
+            ats_type: AtsType::SmartRecruiters,
+            slug: "airnewzealand".to_string(),
+            api_url: "https://api.smartrecruiters.com/v1/companies/airnewzealand/postings".to_string(),
+            domain: Some("airnewzealand.com".to_string()),
+        };
+
+        let data = json!({
+            "content": [
+                {
+                    "id": "6000000000788236",
+                    "uuid": "9f599526-2f47-4d89-891b-d426a7715f00",
+                    "name": "Senior Software Engineer (iOS)",
+                     "company": { "name": "Air New Zealand", "identifier": "AirNewZealand" },
+                    "releasedDate": "2026-01-08T21:57:15.644Z",
+                    "location": {
+                        "city": "Auckland",
+                        "region": "Auckland",
+                        "country": "nz",
+                        "fullLocation": "Auckland, Auckland, New Zealand"
+                    },
+                    "typeOfEmployment": { "label": "Full-time" },
+                    "customField": [
+                        {
+                            "fieldId": "6663765cd273aa35722c76da",
+                            "fieldLabel": "Work Space ",
+                            "valueLabel": "Auckland Airport - Campus (AKL35K)"
+                        }
+                    ]
+                }
+            ]
+        });
+
+        let jobs = AtsType::SmartRecruiters.parse(&company, &data).unwrap();
+        assert_eq!(jobs.len(), 1);
+        let job = &jobs[0];
+        assert_eq!(job.title, "Senior Software Engineer (iOS)");
+        assert_eq!(job.location, "Auckland, Auckland, nz");
+        assert_eq!(job.url, "https://jobs.smartrecruiters.com/airnewzealand/6000000000788236");
+        assert!(job.tags.contains(&"Full-time".to_string()));
+        assert!(job.tags.contains(&"Auckland Airport - Campus (AKL35K)".to_string()));
+    }
+
+    #[test]
+    fn test_parse_breezy() {
+        let company = CompanyEntry {
+            name: "Cal.com".to_string(),
+            ats_type: AtsType::Breezy,
+            slug: "cal-com".to_string(),
+            api_url: "https://cal-com.breezy.hr/json".to_string(),
+            domain: Some("cal.com".to_string()),
+        };
+
+        let data = json!([
+            {
+                "id": "df04fa464882",
+                "name": "Executive Assistant (EA)",
+                "url": "https://cal-com.breezy.hr/p/df04fa464882-executive-assistant-ea",
+                "published_date": "2026-01-09T13:27:24.490Z",
+                "type": { "name": "Full-Time" },
+                "location": {
+                    "country": { "name": "United States" },
+                    "is_remote": true,
+                    "remote_details": { "label": "Fully remote, no location restrictions" },
+                    "name": "United States"
+                },
+                "salary": "$60k"
+            }
+        ]);
+
+        let jobs = AtsType::Breezy.parse(&company, &data).unwrap();
+        assert_eq!(jobs.len(), 1);
+        let job = &jobs[0];
+        assert_eq!(job.title, "Executive Assistant (EA)");
+        assert_eq!(job.location, "United States, United States");
+        assert_eq!(job.url, "https://cal-com.breezy.hr/p/df04fa464882-executive-assistant-ea");
+        assert!(job.tags.contains(&"Full-Time".to_string()));
+        assert!(job.tags.contains(&"Remote".to_string()));
+        assert!(job.tags.contains(&"Fully remote, no location restrictions".to_string()));
+        assert!(job.tags.contains(&"Salary: $60k".to_string()));
     }
 }

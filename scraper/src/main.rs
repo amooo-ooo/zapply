@@ -394,76 +394,109 @@ fn save_json<T: Serialize>(path: &str, data: &T) -> Result<()> {
 
 // --- Scraper Implementation ---
 
+async fn enrich_workable(client: &reqwest::Client, job_id: &str, company_slug: &str) -> Result<Option<String>> {
+    let detail_url = format!("https://apply.workable.com/api/v2/accounts/{}/jobs/{}", 
+        company_slug, job_id.strip_prefix("workable-").unwrap_or(job_id));
+    
+    let resp = client.get(&detail_url).send().await?;
+    if !resp.status().is_success() { return Ok(None); }
+    
+    let detail = resp.json::<WorkableDetail>().await?;
+    let mut desc = detail.description.unwrap_or_default();
+    if let Some(req) = detail.requirements {
+        desc.push_str("<h3>Requirements</h3>");
+        desc.push_str(&req);
+    }
+    if let Some(ben) = detail.benefits {
+        desc.push_str("<h3>Benefits</h3>");
+        desc.push_str(&ben);
+    }
+    Ok(Some(clean_html(&desc)))
+}
+
+async fn enrich_smartrecruiters(client: &reqwest::Client, job_id: &str, company_slug: &str) -> Result<Option<String>> {
+    let job_id = job_id.strip_prefix("smartrecruiters-").unwrap_or(job_id);
+    let detail_url = format!("https://api.smartrecruiters.com/v1/companies/{}/postings/{}", company_slug, job_id);
+    
+    let resp = client.get(&detail_url).send().await?;
+    if !resp.status().is_success() { return Ok(None); }
+    
+    let detail = resp.json::<SmartRecruitersDetail>().await?;
+    let mut desc = String::new();
+    let sections = &detail.job_ad.sections;
+    
+    let mut add_section = |section: &Option<crate::models::SmartRecruitersSection>| {
+        if let Some(sec) = section {
+            if let Some(text) = &sec.text {
+                if !text.is_empty() {
+                    if let Some(title) = &sec.title {
+                        desc.push_str(&format!("<h3>{}</h3>", title));
+                    }
+                    desc.push_str(text);
+                }
+            }
+        }
+    };
+
+    add_section(&sections.job_description);
+    add_section(&sections.qualifications);
+    add_section(&sections.additional_information);
+    
+    Ok(Some(clean_html(&desc)))
+}
+
+async fn enrich_recruitee(client: &reqwest::Client, url: &str, company_slug: &str) -> Result<Option<String>> {
+    let Some(slug) = url.split("/o/").last() else { return Ok(None); };
+    let detail_url = format!("https://{}.recruitee.com/api/offers/{}", company_slug, slug);
+    
+    let resp = client.get(&detail_url).send().await?;
+    if !resp.status().is_success() { return Ok(None); }
+    
+    let detail = resp.json::<RecruiteeDetailResponse>().await?;
+    let mut desc = detail.offer.description.unwrap_or_default();
+    if let Some(req) = detail.offer.requirements {
+        desc.push_str("<h3>Requirements</h3>");
+        desc.push_str(&req);
+    }
+    if let Some(ben) = detail.offer.benefits {
+        desc.push_str("<h3>Benefits</h3>");
+        desc.push_str(&ben);
+    }
+    Ok(Some(clean_html(&desc)))
+}
+
+async fn enrich_breezy(client: &reqwest::Client, url: &str) -> Result<Option<String>> {
+    let resp = client.get(url).send().await?;
+    if !resp.status().is_success() { return Ok(None); }
+    
+    let html = resp.text().await?;
+    let re = regex::Regex::new(r#"(?s)<script type="application/ld\+json">(.*?)</script>"#).expect("Invalid regex");
+    
+    let desc = re.captures_iter(&html)
+        .nth(1) // Usually the second one
+        .and_then(|cap| cap.get(1))
+        .and_then(|m| serde_json::from_str::<crate::models::BreezyLdJson>(m.as_str()).ok())
+        .and_then(|ld| ld.description)
+        .map(|d| clean_html(&d));
+
+    Ok(desc)
+}
+
 async fn enrich_job(client: &reqwest::Client, mut j: Job, company_slug: &str) -> Result<Job> {
     if !j.description.is_empty() { return Ok(j); }
 
-    match j.ats {
-        AtsType::Workable => {
-            let detail_url = format!("https://apply.workable.com/api/v2/accounts/{}/jobs/{}", company_slug, j.id.strip_prefix("workable-").unwrap_or(&j.id));
-            if let Ok(resp) = client.get(&detail_url).send().await {
-                if let Ok(detail) = resp.json::<WorkableDetail>().await {
-                    let mut desc = detail.description.unwrap_or_default();
-                    if let Some(req) = detail.requirements {
-                        desc.push_str("<h3>Requirements</h3>");
-                        desc.push_str(&req);
-                    }
-                    if let Some(ben) = detail.benefits {
-                        desc.push_str("<h3>Benefits</h3>");
-                        desc.push_str(&ben);
-                    }
-                    j.description = clean_html(&desc);
-                }
-            }
-        }
-        AtsType::SmartRecruiters => {
-            let job_id = j.id.strip_prefix("smartrecruiters-").unwrap_or(&j.id);
-            let detail_url = format!("https://api.smartrecruiters.com/v1/companies/{}/postings/{}", company_slug, job_id);
-            
-            if let Ok(resp) = client.get(&detail_url).send().await {
-                if resp.status().is_success() {
-                    if let Ok(detail) = resp.json::<SmartRecruitersDetail>().await {
-                        let mut desc = String::new();
-                        if let Some(sec) = detail.job_ad.sections.job_description {
-                            if let Some(text) = sec.text { desc.push_str(&text); }
-                        }
-                        if let Some(sec) = detail.job_ad.sections.qualifications {
-                            if let Some(text) = sec.text { 
-                                desc.push_str("<h3>Qualifications</h3>");
-                                desc.push_str(&text); 
-                            }
-                        }
-                        if let Some(sec) = detail.job_ad.sections.additional_information {
-                            if let Some(text) = sec.text { 
-                                desc.push_str("<h3>Additional Information</h3>");
-                                desc.push_str(&text); 
-                            }
-                        }
-                        j.description = clean_html(&desc);
-                    }
-                }
-            }
-        }
-        AtsType::Recruitee => {
-            if let Some(slug) = j.url.split("/o/").last() {
-                let detail_url = format!("https://{}.recruitee.com/api/offers/{}", company_slug, slug);
-                if let Ok(resp) = client.get(&detail_url).send().await {
-                    if let Ok(detail) = resp.json::<RecruiteeDetailResponse>().await {
-                        let mut desc = detail.offer.description.unwrap_or_default();
-                        if let Some(req) = detail.offer.requirements {
-                            desc.push_str("<h3>Requirements</h3>");
-                            desc.push_str(&req);
-                        }
-                        if let Some(ben) = detail.offer.benefits {
-                            desc.push_str("<h3>Benefits</h3>");
-                            desc.push_str(&ben);
-                        }
-                        j.description = clean_html(&desc);
-                    }
-                }
-            }
-        }
-        _ => {}
+    let description = match j.ats {
+        AtsType::Workable => enrich_workable(client, &j.id, company_slug).await?,
+        AtsType::SmartRecruiters => enrich_smartrecruiters(client, &j.id, company_slug).await?,
+        AtsType::Recruitee => enrich_recruitee(client, &j.url, company_slug).await?,
+        AtsType::Breezy => enrich_breezy(client, &j.url).await?,
+        _ => None,
+    };
+
+    if let Some(desc) = description {
+        j.description = desc;
     }
+    
     Ok(j)
 }
 
