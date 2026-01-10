@@ -1,13 +1,13 @@
 import fs from 'fs';
 import readline from 'readline';
 import { Readable } from 'stream';
-import type { ReadableStream } from 'stream/web';
+
 import { promises as dns } from 'node:dns';
 
 // Configuration & Types
 
 const CONFIG = {
-    outputFile: 'slugs.json',
+    outputFile: 'scraper/slugs.json',
     indexApiUrl: 'https://index.commoncrawl.org',
     maxIndexesToTry: 4,
     progressInterval: 500,
@@ -143,7 +143,7 @@ const parseCdxLine = (line: string): CdxRecord | null => {
 };
 
 const createLineReader = (body: ReadableStream<Uint8Array>) =>
-    readline.createInterface({ input: Readable.fromWeb(body), crlfDelay: Infinity });
+    readline.createInterface({ input: Readable.fromWeb(body as any), crlfDelay: Infinity });
 
 function extractSlug(url: string, ats: AtsDef): string | null {
     const slug = url.match(ats.pattern)?.[1]?.toLowerCase();
@@ -173,61 +173,91 @@ async function probeIndex(indexId: string): Promise<boolean> {
     }
 }
 
-async function findWorkingIndex(): Promise<string> {
+async function getWorkingIndexes(count: number): Promise<string[]> {
     Logger.info('Fetching Common Crawl index metadata...');
     const res = await fetch(`${CONFIG.indexApiUrl}/collinfo.json`);
     if (!res.ok) throw new Error(`Failed to fetch index list: ${res.statusText}`);
 
-    const indexes = await res.json() as CCIndex[];
-    for (const index of indexes.slice(0, CONFIG.maxIndexesToTry)) {
-        if (await probeIndex(index.id)) return index.id;
+    const allIndexes = await res.json() as CCIndex[];
+    const workingIndexes: string[] = [];
+
+    for (const index of allIndexes) {
+        if (workingIndexes.length >= count) break;
+        if (await probeIndex(index.id)) {
+            workingIndexes.push(index.id);
+        }
     }
-    throw new Error('All primary Common Crawl indexes are currently unreachable.');
+
+    if (workingIndexes.length === 0) {
+        throw new Error('All primary Common Crawl indexes are currently unreachable.');
+    }
+
+    return workingIndexes;
 }
 
 async function extractSlugs(indexId: string, type: AtsType, ats: AtsDef): Promise<Set<string>> {
-    const params = new URLSearchParams({ url: ats.targetUrl, matchType: ats.matchType, output: 'json' });
-    const fullUrl = `${buildCdxUrl(indexId)}?${params}`;
-
-    Logger.info(`Processing ATS: ${type.toUpperCase()}`);
-
-    let attempts = 0;
-    const maxAttempts = 3;
-    let res: Response | null = null;
-
-    while (attempts < maxAttempts) {
-        try {
-            res = await fetch(fullUrl);
-            if (res.ok) break;
-            Logger.warn(`Attempt ${attempts + 1} failed: ${res.status} ${res.statusText}`);
-        } catch (e) {
-            Logger.warn(`Attempt ${attempts + 1} error: ${e instanceof Error ? e.message : String(e)}`);
-        }
-        attempts++;
-        if (attempts < maxAttempts) {
-            const delay = 1000 * Math.pow(2, attempts); // 2s, 4s, 8s
-            Logger.status(`Retrying in ${delay / 1000}s... `);
-            await new Promise(r => setTimeout(r, delay));
-        }
-    }
-
-    if (!res || !res.ok) {
-        Logger.error(`Failed to fetch source for ${type} after ${maxAttempts} attempts.`);
-        return new Set();
-    }
-
     const slugs = new Set<string>();
     let totalProcessed = 0;
+    let page = 0;
 
-    if (!res.body) return slugs;
+    // Check pagination first
+    const pageCheckUrl = `${buildCdxUrl(indexId)}?url=${ats.targetUrl}&matchType=${ats.matchType}&output=json&showNumPages=true`;
+    let numPages = 1;
 
-    for await (const line of createLineReader(res.body)) {
-        const record = parseCdxLine(line);
-        const slug = extractSlug(record?.url || '', ats);
-        if (slug) slugs.add(slug);
+    try {
+        const pageRes = await fetch(pageCheckUrl);
+        if (pageRes.ok) {
+            const info = await pageRes.json() as { pages: number };
+            numPages = info.pages || 1;
+        }
+    } catch {
+        // ignore, default to 1
+    }
 
-        if (++totalProcessed % CONFIG.progressInterval === 0) {
-            Logger.progress(`Found ${slugs.size.toLocaleString()} companies (scanned ${totalProcessed.toLocaleString()} records)`);
+    Logger.info(`Processing ATS: ${type.toUpperCase()} (${numPages} pages)`);
+
+    for (let p = 0; p < numPages; p++) {
+        const params = new URLSearchParams({
+            url: ats.targetUrl,
+            matchType: ats.matchType,
+            output: 'json',
+            page: p.toString()
+        });
+        const fullUrl = `${buildCdxUrl(indexId)}?${params}`;
+
+        // ... fetch logic ...
+        let attempts = 0;
+        const maxAttempts = 3;
+        let res: Response | null = null;
+
+        while (attempts < maxAttempts) {
+            try {
+                res = await fetch(fullUrl);
+                if (res.ok) break;
+                // Logger.warn(`Attempt ${attempts + 1} failed...`);
+            } catch (e) {
+                // Logger.warn(...)
+            }
+            attempts++;
+            if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempts)));
+        }
+
+        if (!res || !res.ok) {
+            Logger.warn(`Failed to fetch page ${p} for ${type}. Skipping.`);
+            continue;
+        }
+
+        if (!res.body) continue;
+
+        const reader = createLineReader(res.body);
+        for await (const line of reader) {
+            const record = parseCdxLine(line);
+            const slug = extractSlug(record?.url || '', ats);
+            if (slug) slugs.add(slug);
+
+            if (++totalProcessed % CONFIG.progressInterval === 0) {
+                Logger.progress(`Found ${slugs.size.toLocaleString()} companies (scanned ${totalProcessed.toLocaleString()} records)`);
+            }
         }
     }
 
@@ -248,7 +278,7 @@ const WORD_TO_NUM: Record<string, string> = {
 };
 
 async function resolveDomain(slug: string): Promise<string | null> {
-    const tlds = ['.com', '.io', '.co', '.ai', '.app', '.dev', '.net', '.org'];
+    const tlds = ['.com', '.io', '.co', '.ai', '.app', '.dev', '.net', '.org', '.nz', '.co.nz'];
     const variations = [
         (s: string) => s,
         (s: string) => `www.${s}`,
@@ -340,8 +370,13 @@ async function resolveDomain(slug: string): Promise<string | null> {
 
     // 2. Try Exact Match for all bases with all TLDs
     // Prioritize exact matches over variations
+    // NEW: Specifically prioritize .nz and .co.nz for NZ company discovery
+    const nzTlds = ['.nz', '.co.nz'];
+    const otherTlds = tlds.filter(t => !nzTlds.includes(t));
+    const prioritizedTlds = [...nzTlds, ...otherTlds];
+
     for (const base of uniqueBases) {
-        const candidates = tlds.map(tld => `${base}${tld}`);
+        const candidates = prioritizedTlds.map(tld => `${base}${tld}`);
         const found = await tryResolve(candidates);
         if (found) return found;
     }
@@ -363,15 +398,75 @@ async function resolveDomain(slug: string): Promise<string | null> {
     return null;
 }
 
+// Domain Extraction
+
+// Helper to append updates to the cache file (Smart Append)
+function saveBatch(entries: CompanyEntry[]) {
+    if (entries.length === 0) return;
+
+    if (!fs.existsSync(CONFIG.outputFile)) {
+        fs.writeFileSync(CONFIG.outputFile, JSON.stringify(entries, null, 2));
+        return;
+    }
+
+    const stats = fs.statSync(CONFIG.outputFile);
+    const fd = fs.openSync(CONFIG.outputFile, 'r+');
+
+    try {
+        const bufferSize = Math.min(1024, stats.size);
+        const buffer = Buffer.alloc(bufferSize);
+        fs.readSync(fd, buffer, 0, bufferSize, stats.size - bufferSize);
+
+        let lastBracketIndex = -1;
+        for (let i = bufferSize - 1; i >= 0; i--) {
+            if (buffer[i] === 93) { // ']'
+                lastBracketIndex = i;
+                break;
+            }
+        }
+
+        if (lastBracketIndex === -1) {
+            Logger.warn('Could not find closing bracket in file to append. Skipping batch write.');
+            return;
+        }
+
+        const position = stats.size - bufferSize + lastBracketIndex;
+
+        let needsComma = true;
+        for (let i = lastBracketIndex - 1; i >= 0; i--) {
+            const char = buffer[i];
+            if (char === 91) { // '['
+                needsComma = false;
+                break;
+            }
+            if (char !== 32 && char !== 10 && char !== 13 && char !== 9) {
+                break;
+            }
+        }
+
+        const newContent = (needsComma ? ',' : '') + JSON.stringify(entries, null, 2).slice(1, -1) + ']';
+        fs.writeSync(fd, newContent, position, 'utf-8');
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
 // Driver
 
 async function main() {
     Logger.info('Initializing Zapply Slug Scraper');
-    console.log('');
+
+    // Simple CLI argument parsing
+    const args = process.argv.slice(2);
+    const limitArg = args.find(a => a.startsWith('--limit='))?.split('=')[1];
+    const typeArg = args.find(a => a.startsWith('--type='))?.split('=')[1];
+    const runLimit = limitArg ? parseInt(limitArg) : Infinity;
 
     try {
         let allEntries: CompanyEntry[] = [];
         const processedSet = new Set<string>();
+        const domainCache = new Map<string, string>();
+        let pendingEntries: CompanyEntry[] = [];
 
         if (fs.existsSync(CONFIG.outputFile)) {
             try {
@@ -379,6 +474,9 @@ async function main() {
                 allEntries = JSON.parse(raw);
                 for (const entry of allEntries) {
                     processedSet.add(`${entry.type}:${entry.slug}`);
+                    if (entry.domain) {
+                        domainCache.set(entry.slug, entry.domain);
+                    }
                 }
                 Logger.info(`Loaded ${allEntries.length} existing entries from cache.`);
             } catch (e) {
@@ -386,75 +484,109 @@ async function main() {
             }
         }
 
-        const indexId = await findWorkingIndex();
-        let totalNewProcessed = 0;
+        const indexesToScan = await getWorkingIndexes(3); // Scan last 3 indexes
+        Logger.info(`Scanning ${indexesToScan.length} indexes: ${indexesToScan.join(', ')}`);
 
-        for (const [type, config] of Object.entries(ATS_CONFIGS) as [AtsType, AtsDef][]) {
-            if (type === 'lever') {
-                Logger.info(`Skipping LEVER (commoncrawl robots.txt restriction)`);
-                continue;
-            }
+        let totalNewProcessedAcrossAll = 0;
 
-            const slugs = await extractSlugs(indexId, type, config);
+        for (const indexId of indexesToScan) {
+            if (totalNewProcessedAcrossAll >= runLimit) break;
+            Logger.info(`\n=== Processing Index: ${indexId} ===`);
 
-            // Filter out already processed slugs
-            const slugsToProcess = Array.from(slugs).filter(s => !processedSet.has(`${type}:${s}`));
+            for (const [type, config] of Object.entries(ATS_CONFIGS) as [AtsType, AtsDef][]) {
+                if (totalNewProcessedAcrossAll >= runLimit) break;
+                if (typeArg && type !== typeArg) continue;
 
-            if (slugsToProcess.length === 0) {
-                Logger.info(`${type.toUpperCase()} - Already fully cached (${slugs.size} slugs).`);
-                continue;
-            }
 
-            Logger.info(`Enriching ${slugsToProcess.length} NEW ${type} candidates (skipped ${slugs.size - slugsToProcess.length} cached)...`);
-
-            // Chunking for resource efficiency
-            const chunkSize = CONFIG.concurrency;
-
-            let entriesSinceLastWrite = 0;
-
-            for (let i = 0; i < slugsToProcess.length; i += chunkSize) {
-                const chunk = slugsToProcess.slice(i, i + chunkSize);
-
-                const newEntries = await Promise.all(chunk.map(async (slug) => {
-                    const domain = await resolveDomain(slug);
-                    return {
-                        name: formatName(slug),
-                        type,
-                        slug,
-                        board_url: config.boardUrl(slug),
-                        api_url: config.apiUrl(slug),
-                        domain: domain || undefined
-                    } as CompanyEntry;
-                }));
-
-                for (const entry of newEntries) {
-                    allEntries.push(entry);
-                    processedSet.add(`${entry.type}:${entry.slug}`);
+                if (type === 'lever') {
+                    Logger.info(`Skipping LEVER (commoncrawl robots.txt restriction)`);
+                    continue;
                 }
 
-                entriesSinceLastWrite += chunk.length;
-                totalNewProcessed += chunk.length;
+                const slugsFound = await extractSlugs(indexId, type, config);
 
-                if (entriesSinceLastWrite >= CONFIG.bufferSize) {
-                    fs.writeFileSync(CONFIG.outputFile, JSON.stringify(allEntries, null, 2));
-                    entriesSinceLastWrite = 0;
+                // Filter out already processed slugs for THIS type
+                const slugsToProcess = Array.from(slugsFound).filter(s => !processedSet.has(`${type}:${s}`));
+
+                if (slugsToProcess.length === 0) {
+                    Logger.info(`${type.toUpperCase()} - No NEW slugs found (all ${slugsFound.size} cached for this type).`);
+                    continue;
                 }
 
-                if (totalNewProcessed % 100 === 0) {
-                    process.stdout.write(`\r[PROG] Processed ${totalNewProcessed} new/pending companies...`);
+                Logger.info(`Enriching ${slugsToProcess.length} NEW ${type} candidates...`);
+
+                // Chunking for resource efficiency
+                const chunkSize = CONFIG.concurrency;
+                let totalNewForType = 0;
+
+                for (let i = 0; i < slugsToProcess.length; i += chunkSize) {
+                    const remaining = runLimit - totalNewProcessedAcrossAll;
+                    if (remaining <= 0) break;
+
+                    const chunk = slugsToProcess.slice(i, i + Math.min(chunkSize, remaining));
+
+                    const newEntries = await Promise.all(chunk.map(async (slug) => {
+                        // 1. Try reusing domain if we have it for this slug under another ATS
+                        let domain = domainCache.get(slug);
+
+                        // 2. Resolve if not found
+                        if (!domain) {
+                            domain = await resolveDomain(slug) || undefined;
+                        }
+
+                        if (domain) domainCache.set(slug, domain);
+
+                        return {
+                            name: formatName(slug),
+                            type,
+                            slug,
+                            board_url: config.boardUrl(slug),
+                            api_url: config.apiUrl(slug),
+                            domain: domain
+                        } as CompanyEntry;
+                    }));
+
+                    for (const entry of newEntries) {
+                        allEntries.push(entry);
+                        processedSet.add(`${entry.type}:${entry.slug}`);
+                        pendingEntries.push(entry);
+                    }
+
+                    if (pendingEntries.length >= CONFIG.bufferSize) {
+                        saveBatch(pendingEntries);
+                        pendingEntries = [];
+                    }
+
+                    totalNewForType += chunk.length;
+                    totalNewProcessedAcrossAll += chunk.length;
+
+                    if (totalNewProcessedAcrossAll % 50 === 0) {
+                        process.stdout.write(`\r[PROG] Processed ${totalNewProcessedAcrossAll} new companies (Limit: ${runLimit})...`);
+                    }
+
+                    if (totalNewProcessedAcrossAll >= runLimit) {
+                        Logger.info(`\nReached run limit of ${runLimit}.`);
+                        break;
+                    }
                 }
+                console.log('');
             }
+
             console.log('');
+        }
+
+        // Flush remaining entries
+        if (pendingEntries.length > 0) {
+            saveBatch(pendingEntries);
+            pendingEntries = [];
         }
 
         console.log('');
         Logger.info(`Finalizing data collection...`);
         Logger.info(`Statistics: ${allEntries.length.toLocaleString()} total companies across ${Object.keys(ATS_CONFIGS).length} ATS sources.`);
+        Logger.info(`${totalNewProcessedAcrossAll.toLocaleString()} companies added.`);
 
-        allEntries.sort((a, b) => a.name.localeCompare(b.name));
-        Logger.status(`Writing final output to ${CONFIG.outputFile}... `);
-        fs.writeFileSync(CONFIG.outputFile, JSON.stringify(allEntries, null, 2));
-        Logger.success(`File ${CONFIG.outputFile} written successfully.`);
+        Logger.success(`File ${CONFIG.outputFile} updated successfully.`);
 
         Logger.info('Scraper operation completed.');
     } catch (err) {
